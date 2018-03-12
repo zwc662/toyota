@@ -96,9 +96,9 @@ class mdp:
         return state
     
     def preprocess_list(self, data):
-	# Preprocess the data set file
-	# Each trajectory is a list
-	# Each element in a list is a list of time step, dict of observations and ...
+	# Preprocess the data set file which contains trajectories
+	# Each trajectory is a list in which each element in a list is a list of time step, dict of observations and ...
+	# This method translates the observations to states
         tuples = []
         file_i = open(data, 'r')
         print("read list file")

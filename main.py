@@ -8,11 +8,12 @@ from preprocess import preprocess_dict, preprocess_list
 
 if __name__ == "__main__":
     print("hehe")
-    preprocess_dict('/home/zekunzhou/workspace/toyota_project/data/data.json')
+    #preprocess_dict('/home/zekunzhou/workspace/toyota_project/data/data.json')
     preprocess_list('/home/zekunzhou/workspace/toyota_project/data/data.json')
     
     M = mdp()
     '''
+    #Simple MDP for testing
     M.build_from_config(4,2)
     M.set_starts([0])
     M.set_targets([2])
@@ -29,7 +30,10 @@ if __name__ == "__main__":
     M.build_from_discretizer(num_actions = 5)
     M.preprocess_list("/home/zekunzhou/workspace/toyota_project/data/demo")
     M.set_transitions("/home/zekunzhou/workspace/toyota_project/data/transitions")
+
+    #Randomly generate a policy
     policy = np.random.randint(0, 5, len(M.S))
+    #In each state there is a distribution of actions to take
     policy = np.random.rand(len(M.S), len(M.A))
     policy_ = np.linalg.norm(policy, axis = 1).reshape([len(M.S), 1])
     policy = policy / policy_
@@ -39,6 +43,8 @@ if __name__ == "__main__":
     
     M.output()
     exit()
+
+    ##Use script to run PRISM, somehow doesn't work. Still working on it.
     os.system('/home/zekunzhou/workspace/toyota_project/prism-4.4.beta-src/src/demos/run /home/zekunzhou/workspace/toyota_project/')
     os.system('/home/zekunzhou/workspace/toyota_project/prism-4.4.beta-src/bin/prism ./grid_world.pm ./grid_world.pctl')
 

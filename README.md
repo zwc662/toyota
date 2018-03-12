@@ -1,7 +1,7 @@
 # toyota
 data file is in ./data
 
-discretizer.py discretize
+discretizer.py discretizes
 
 mdp.py builds the MDP
 

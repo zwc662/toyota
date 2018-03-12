@@ -6,37 +6,56 @@ from discretizer import discretizer
 
 class mdp:
     def __init__(self):
-        self.S = list() ## extra states S[-1] is the unsafe terminal and S[-2] the initial terminal
+        self.S = list() 
+	## Always add two extra states at the end
+	## S[-1] is the single unsafe terminal and S[-2] is the sngle initial terminal
+	## All unsafe states have probability 1 to reach the unsafe terminal
+	## From initial terminal there is a distribution of transiting to the initial states
         self.A = list()
+	## List of actions
         self.T = None
+	## A list of numpy transition matrices for each actions
+	## [T(_, a_0, _), T(_, a_1, _), ...]
         self.P = None
+	## The transition probability of DTMC given a policy
         self.policy = None
+	## Policy is a |S|x|A| matrix of distributions actions for each states
         self.targets = list()
+	## A list of absorbing target state to be reached, may be empty
         self.starts = list()
+	## A list of initial states
         self.unsafes = list()
+	## A list of unsafe states
         self.discretizer = discretizer()
+	## Include the discretizer as a member
 
     def build_from_config(self, num_states, num_actions):
-        self.S = range(num_states + 2)   ##Add one external source
-        self.A = range(num_actions)
+	## Only have the number of states and actions, build the MDP
+        self.S = range(num_states + 2)   ##Add two external source
+        self.A = range(num_actions) 
         self.T = []
 	for a in range(len(self.A)):
-		self.T.append(np.zeros([len(self.S), len(self.S)], dtype = np.int8))  ##Init transition probability to be all zero
+		self.T.append(np.zeros([len(self.S), len(self.S)], dtype = np.int8)) 
+	##Init transition matrices to be all zero
     
     def build_from_discretizer(self, discretizer = None, num_actions = None):
+	## Given a discretizer, build the MDP
         if discretizer != None:
             self.discretizer = discretizer
-        print(self.discretizer.grids)
-        self.S = range(np.array(self.discretizer.grids).prod() + 2)   ##Add two external source
-        print(len(self.S))
+        #print(self.discretizer.grids)
+        self.S = range(np.array(self.discretizer.grids).prod() + 2)   
+	##Add two external source
+        #print(len(self.S))
         self.A = range(num_actions)
         print(len(self.A))
 	self.T = []
 	for a in range(len(self.A)):
-		self.T.append(np.zeros([len(self.S), len(self.S)], dtype = np.int8))  ##Init transition probability to be all zero
+		self.T.append(np.zeros([len(self.S), len(self.S)], dtype = np.int8))  
+	##Init transition matricies to be all zero
         print("construction complete")
             
     def set_starts(self, starts):
+	##Set uniform distribution of starting from each initial states
         self.starts = starts
 	for a in range(len(self.A)):
         	self.T[a][:, self.S[-2]] = self.T[a][:, self.S[-2]] * 0.0
@@ -46,12 +65,14 @@ class mdp:
         	self.T[a][self.S[-2], self.starts] = 1.0/len(self.starts)
 
     def set_targets(self, targets):
+	# Set target states to be absorbing
         self.targets = targets
 	for a in range(len(self.A)):
         	self.T[a][self.targets] = self.T[a][self.targets] * 0.0
         	self.T[a][self.targets, self.targets] = 1.0
 
     def set_unsafes(self, unsafes):
+	# Set all probabilities of transitioning from unsafe states to unsafe terminal to be 1
         self.unsafes = unsafes
         
 	for a in range(len(self.A)):
@@ -63,6 +84,8 @@ class mdp:
         	self.T[a][self.unsafes, self.S[-1]] = 1.0
 
     def observation_to_state(self, observation):
+	# Translate observation to coordinate by calling the discretizer
+	# Then translate the coordinate to state
         coord = self.discretizer.observation_to_coord(observation)
         state = coord[0]
         for i in range(1, len(coord)):
@@ -73,6 +96,9 @@ class mdp:
         return state
     
     def preprocess_list(self, data):
+	# Preprocess the data set file
+	# Each trajectory is a list
+	# Each element in a list is a list of time step, dict of observations and ...
         tuples = []
         file_i = open(data, 'r')
         print("read list file")
@@ -92,6 +118,9 @@ class mdp:
         file_o.close()
     
     def set_transitions(self, transitions):
+	# Count the times of transitioning from one state to another
+	# Calculate the probability
+	# Give value to self.T
         file = open(str(transitions), 'r')
         for line_str in file.readlines():
             	line = line_str.split('\n')[0].split(' ')
@@ -109,6 +138,7 @@ class mdp:
                     	self.T[a][s] = (self.T[a][s]/norm).astype(np.float32)
          
     def set_policy(self, policy):
+	# Given policy, calculate self.P, the transition matrix of derived DTMC
         assert policy.shape == (len(self.S), len(self.A))
         if (policy.sum(axis = 1) <= np.ones([len(self.S)]).astype(np.float32)).all():
             	polcy = policy + ((np.ones([len(self.S)]).astype(np.float32) - policy.sum(axis = 1))/len(self.A)).reshape([len(self.S), 1])
@@ -134,6 +164,7 @@ class mdp:
 
 
     def output(self):
+	# Output files for PRISM
         os.system('rm ./state_space')
         os.system('touch ./state_space')
         file = open('./state_space', 'w')

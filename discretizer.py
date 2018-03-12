@@ -18,8 +18,10 @@ class discretizer:
                          [-42.0, -40.5],#lane pos
                          ] ##list of threshes for each dimension
         '''
-        self.grids = [4, 4, 2, 2, 3, 3, 3, 3, 3]  ##list of unit numbers in each dimension
+        self.grids = [4, 4, 2, 2, 3, 3, 3, 3, 3]  ##number of intervals in each dimension
         ##[front dist, rear dist, left, right, front speed, rear speed, left speed, right speed, lane pos]
+	
+	##Thresholds for each interval
         self.threshes = [
                          [5, 15, 25],#front dist
                          [5, 15, 25],#rear dist
@@ -36,11 +38,12 @@ class discretizer:
         assert len(grids) == len(threshes)
         for i in range(len(grids)):
             if(grids[i] != len(threshes[i])):
-               raise ValueError("threshes conflict grids")
+               raise ValueError("threshold number conflict grids")
         self.grids = grids
         self.threshes = threshes
     
     def observation_to_coord(self, observation):
+	##translate observation to coordinates
         coord = np.zeros([len(self.grids)])
         for i in range(len(observation)):
             for j in range(len(self.threshes[i])):

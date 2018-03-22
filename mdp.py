@@ -395,7 +395,6 @@ class mdp:
 			temp = np.zeros((len(self.S)))
 			temp[s] = 1
 			G_ = np.reshape(discount * (self.P[s] - temp), (1, len(self.S)))[0].tolist() 
-			print(len(G_[0]))
 			G.append(G_[0]) 
 			h_ = -1.0 * np.dot(self.P[s], self.features.T[f])[0, 0]
     			h.append(h_)

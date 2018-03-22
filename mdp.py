@@ -1,9 +1,6 @@
 import numpy as np
-<<<<<<< HEAD
 from cvxopt import matrix, solvers
 from sklearn.preprocessing import normalize
-=======
->>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
 import inspect
 from scipy import sparse
 from itertools import product
@@ -11,7 +8,6 @@ from multiprocessing import Pool
 import os
 import ast
 import time
-<<<<<<< HEAD
 import mdptoolbox
 from discretizer import discretizer
 from timeit import default_timer as timer
@@ -22,6 +18,8 @@ import pycuda.driver as pycu
 import pycuda.autoinit
 from pycuda.reduction import ReductionKernel
 import numba.cuda as cuda 
+from discretizer import discretizer
+import mdptoolbox 
 
 @vectorize(["float64(float64, float64)"], target='cuda')
 def VectorDot(a, b):
@@ -31,10 +29,6 @@ def VectorDot(a, b):
 dot = ReductionKernel(dtype_out=np.float64, neutral="0",
                       reduce_expr="a+b", map_expr="x[i]*y[i]",
                       arguments="float *x, float *y")
-=======
-from discretizer import discretizer
-import mdptoolbox 
->>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
 
 class mdp:
 
@@ -61,10 +55,9 @@ class mdp:
         self.unsafes = list()
         # A list of unsafe states
 	self.features = None
-<<<<<<< HEAD
+
 	self.reward = None
-=======
->>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
+
 	# Features of all states
         self.discretizer = discretizer()
         # Include the discretizer as a member
@@ -188,10 +181,6 @@ class mdp:
 	    self.T[a] = sparse.bsr_matrix(self.T[a])
 	    self.T[a] = sparse.diags(1.0/self.T[a].sum(axis = 1).A.ravel()).dot(self.T[a])
 
-<<<<<<< HEAD
-
-=======
->>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
     def set_policy(self, policy):
 	'''
         # Given policy, calculate self.P, the transition matrix of derived DTMC
@@ -208,22 +197,12 @@ class mdp:
         	self.policy = policy.todense()
 	else:
 		self.policy = policy
-<<<<<<< HEAD
 
 	assert self.policy.shape == (len(self.S), len(self.A))
         self.P = sparse.csr_matrix(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
         for a in range(len(self.A)):
             self.P += self.T[a].dot(sparse.bsr_matrix(np.repeat(np.reshape(self.policy.T[a], [len(self.S), 1]), len(self.S), axis = 1 )))
 	self.P = sparse.diags(1.0/self.P.sum(axis = 1).A.ravel()).dot(self.P)
-
-=======
-
-	assert self.policy.shape == (len(self.S), len(self.A))
-        self.P = sparse.csr_matrix(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
-        for a in range(len(self.A)):
-            self.P += self.T[a].dot(sparse.csr_matrix(np.repeat(np.reshape(self.policy.T[a], [len(self.S), 1]), len(self.S), axis = 1 )))
-	self.P = sparse.diags(1.0/self.P.sum(axis = 1).A.ravel()).dot(self.P)
->>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
         print("DTMC transition constructed")
 
     def output(self):
@@ -324,7 +303,6 @@ class mdp:
         	while True:
             		itr += 1
 
-<<<<<<< HEAD
     def value_iteration(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
 		
 	#M = mdptoolbox.mdp.MDP(np.array(self.T), reward, discount, epsilon, max_iter)
@@ -416,19 +394,4 @@ class mdp:
 	#delta_mu = np.linalg.norm(delta_mus[index], ord =2)  
 	return 0, w, t
 	
-=======
-            		V_temp = V.copy()
 
-            		# Bellman Operator: compute policy and value functions
- 			V = self.features[:, f] + discount * self.P.dot(V)
-
-            		variation = mdptoolbox.util.getSpan(V - V_temp)
-			print('iteration %d, diff = %f' % (itr, variation))
-
-            		if variation < VL.thresh:
-                		break
-            		elif itr == max_iter:
-                		break
-		mu.append(V[-2])
-	return mu
->>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43

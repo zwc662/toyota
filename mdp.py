@@ -1,9 +1,6 @@
 import numpy as np
-<<<<<<< HEAD
 from cvxopt import matrix, solvers
 from sklearn.preprocessing import normalize
-=======
->>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
 import inspect
 from scipy import sparse
 from itertools import product
@@ -11,7 +8,6 @@ from multiprocessing import Pool
 import os
 import ast
 import time
-<<<<<<< HEAD
 import mdptoolbox
 from discretizer import discretizer
 from timeit import default_timer as timer
@@ -23,6 +19,9 @@ import pycuda.autoinit
 from pycuda.reduction import ReductionKernel
 import numba.cuda as cuda 
 
+from discretizer import discretizer
+import mdptoolbox 
+
 @vectorize(["float64(float64, float64)"], target='cuda')
 def VectorDot(a, b):
 	return a * b
@@ -31,10 +30,6 @@ def VectorDot(a, b):
 dot = ReductionKernel(dtype_out=np.float64, neutral="0",
                       reduce_expr="a+b", map_expr="x[i]*y[i]",
                       arguments="float *x, float *y")
-=======
-from discretizer import discretizer
-import mdptoolbox 
->>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
 
 class mdp:
 
@@ -61,10 +56,7 @@ class mdp:
         self.unsafes = list()
         # A list of unsafe states
 	self.features = None
-<<<<<<< HEAD
 	self.reward = None
-=======
->>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
 	# Features of all states
         self.discretizer = discretizer()
         # Include the discretizer as a member
@@ -188,10 +180,22 @@ class mdp:
 	    self.T[a] = sparse.bsr_matrix(self.T[a])
 	    self.T[a] = sparse.diags(1.0/self.T[a].sum(axis = 1).A.ravel()).dot(self.T[a])
 
-<<<<<<< HEAD
 
-=======
->>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
+    def set_transitions_random(self):
+        # Count the times of transitioning from one state to another
+        # Calculate the probability
+        # Give value to self.T
+	self.T = list()
+        for a in range(len(self.A)):
+	    self.T.append(100 * np.random.randint(2, size= (len(self.S), len(self.S))))
+            for s in range(len(self.S)):
+                tot = np.sum(self.T[a][s])
+                if tot == 0.0:
+                    self.T[a][s,s] = 1.0
+	    self.T[a] = sparse.bsr_matrix(self.T[a])
+	    self.T[a] = sparse.diags(1.0/self.T[a].sum(axis = 1).A.ravel()).dot(self.T[a])
+
+
     def set_policy(self, policy):
 	'''
         # Given policy, calculate self.P, the transition matrix of derived DTMC
@@ -208,22 +212,13 @@ class mdp:
         	self.policy = policy.todense()
 	else:
 		self.policy = policy
-<<<<<<< HEAD
 
 	assert self.policy.shape == (len(self.S), len(self.A))
-        self.P = sparse.csr_matrix(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
+        self.P = sparse.bsr_matrix(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
         for a in range(len(self.A)):
             self.P += self.T[a].dot(sparse.bsr_matrix(np.repeat(np.reshape(self.policy.T[a], [len(self.S), 1]), len(self.S), axis = 1 )))
 	self.P = sparse.diags(1.0/self.P.sum(axis = 1).A.ravel()).dot(self.P)
 
-=======
-
-	assert self.policy.shape == (len(self.S), len(self.A))
-        self.P = sparse.csr_matrix(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
-        for a in range(len(self.A)):
-            self.P += self.T[a].dot(sparse.csr_matrix(np.repeat(np.reshape(self.policy.T[a], [len(self.S), 1]), len(self.S), axis = 1 )))
-	self.P = sparse.diags(1.0/self.P.sum(axis = 1).A.ravel()).dot(self.P)
->>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
         print("DTMC transition constructed")
 
     def output(self):
@@ -277,17 +272,6 @@ class mdp:
 
         file.close()
 
-    def value_iteration(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
-	reward = np.random.randint(2, size = [len(self.S), ]).astype(float)
-		
-	M = mdptoolbox.mdp.MDP(np.array(self.T), reward, discount, epsilon, max_iter)
-	VL = mdptoolbox.mdp.ValueIteration(np.array(self.T), reward, discount, epsilon, max_iter, initial_value = 0)
-	VL.run()
-	policy = np.zeros([len(self.S), len(self.A)]).astype(float)
- 	for s in range(len(VL.policy)):
-		policy[s, VL.policy[s]] = 1.0
-	policy = sparse.csc_matrix(policy)
-	return policy
 		
     def expected_features_(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
 	itr = 0
@@ -308,25 +292,20 @@ class mdp:
 	mu = []
 	for f in range(self.features.shape[-1]):
 		V = self.features[:, f].reshape(len(self.S))
-		VL = mdptoolbox.mdp.ValueIteration(np.array(self.T), V, discount, epsilon, max_iter, initial_value = 0)
-        	if discount < 1:
-            	# compute a bound for the number of iterations and update the
-            	# stored value of self.max_iter
-            		VL._boundIter(epsilon)
-            	# computation of threshold of variation for V for an epsilon-
-           	 # optimal policy
-            		VL.thresh = epsilon * (1 - discount) / discount
-        	else: # discount == 1
-            		# threshold of variation for V for an epsilon-optimal policy
-            		VL.thresh = epsilon
-		
+		VL = mdptoolbox.mdp.ValueIteration(np.array([self.P]), V, discount, epsilon, max_iter, initial_value = 0)
 		itr = 0
-        	while True:
-            		itr += 1
+		VL.run()
+		mu.append(VL.V[-2])
 
-<<<<<<< HEAD
+    def expected_value(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+	if type(self.P) is not type(self.T[0]):
+		self.P = type(self.T[0])(self.P)
+	VL = mdptoolbox.mdp.ValueIteration(np.array([self.P]), self.reward, discount, epsilon, max_iter, initial_value = 0)
+	print("Calculating expected value")
+	VL.run()
+	return VL.V
+
     def value_iteration(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
-		
 	#M = mdptoolbox.mdp.MDP(np.array(self.T), reward, discount, epsilon, max_iter)
 	VL = mdptoolbox.mdp.ValueIteration(np.array(self.T), self.reward, discount, epsilon, max_iter, initial_value = 0)
 	VL.run()
@@ -337,7 +316,7 @@ class mdp:
 	return policy
 		
 	
-    def expected_value(self, reward = None, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+    def expected_value_(self, reward = None, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
 	if reward is None:
 		reward = self.reward
 	itr = 0
@@ -358,44 +337,24 @@ class mdp:
 
     def QP(self, expert, features, epsilon = 1e-5):
 	assert expert.shape[-1] == np.array(features).shape[-1]
-
 	G_i = []
 	h_i = []
-		
 	for k in range(len(expert)):
 		G_i.append([0])	
 	G_i.append([-1])
-		#G_i = [[- (exp_mu[0] - mus[i][0])],
-		#	[- (exp_mu[1] - mus[i][1])],
-		#	[- (exp_mu[2] - mus[i][2])],
-		#	[- (exp_mu[3] - mus[i][3])]
-		#]
 	h_i = [0]
 	c = matrix(np.eye(len(expert) + 1)[-1] * -1)
 	for j in range(len(features)):
 		for k in range(len(expert)):
 			G_i[k].append( - expert[k] + features[j][k])	
 		G_i[len(expert)].append(1)
-			#G_i[0].append(-1 * mus[i][0] - (-1) * mus[j][0])
-			#G_i[1].append(-1 * mus[i][1] - (-1) * mus[j][1])
-			#G_i[2].append(-1 * mus[i][2] - (-1) * mus[j][2])
-			#G_i[3].append(-1 * mus[i][3] - (-1) * mus[j][3])
 		h_i.append(0)
 	for k in range(len(expert)):
 		G_i[k] = G_i[k] + [0.0] * (k + 1) + [-1.0] + [0.0] * (len(expert) + 1 - k - 1)
 	G_i[len(expert)] = G_i[len(expert)] + [0.0] * (1 + len(expert)) + [0.0]
 	h_i = h_i + [1] + (1 + len(expert)) * [0.0]
-		#G_i[0]= G_i[0] + [0., -1., 0., 0., 0., 0.]
-		#G_i[1]= G_i[1] + [0., 0., -1., 0., 0., 0.]
-		#G_i[2]= G_i[2] + [0., 0., 0., -1., 0., 0.]
-		#G_i[3]= G_i[3] + [0., 0., 0., 0., -1., 0.]
-		#G_i[4]= G_i[4] + [0., 0., 0., 0., 0., 0.,]
-		#h_i = h_i + [1., 0., 0., 0., 0., 0.]
-
 	G = matrix(G_i)
-	#	h = matrix([-1 * penalty, 1., 0., 0., 0.])
 	h = matrix(h_i)
-
 	dims = {'l': 1 + len(features), 'q': [len(expert) + 1, 1], 's': []}
 	start = time.time()
 	sol = solvers.conelp(c, G, h, dims)
@@ -412,23 +371,31 @@ class mdp:
 		w = None
 		t = None
 	
-	#solution = delta_mus[index]/np.linalg.norm(delta_mus[index], ord =2)
-	#delta_mu = np.linalg.norm(delta_mus[index], ord =2)  
 	return 0, w, t
 	
-=======
-            		V_temp = V.copy()
-
-            		# Bellman Operator: compute policy and value functions
- 			V = self.features[:, f] + discount * self.P.dot(V)
-
-            		variation = mdptoolbox.util.getSpan(V - V_temp)
-			print('iteration %d, diff = %f' % (itr, variation))
-
-            		if variation < VL.thresh:
-                		break
-            		elif itr == max_iter:
-                		break
-		mu.append(V[-2])
-	return mu
->>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
+    def LP_features(self, epsilon = 1e-5, discount = 0.5):
+    	self.P = self.P.todense()
+    	mu = []
+    	for f in range(len(self.features[0])):
+    		start = time.time()
+    		c = list()
+    		for s in self.S:
+    			c.append(1.0)
+    		G = list()
+    		h = list()
+    		for s in self.S:
+    			G_ = []
+    			for s_ in self.S:
+    				if s != s_: 
+    		 			G_.append(self.P[s, s_] * discount)
+    				else:
+    		 			G_.append(self.P[s, s_] * discount - 1.0)
+    			G.append(G_)
+    			h.append(-1.0 * np.dot(self.P[s], self.features.T[f]))
+		print("Start solving feature %d..." % f)
+    		sol = solvers.lp(matrix(c), matrix(G), matrix(h))
+    		mu.append(np.array(sol['x']).reshape((len(self.S)))[-2])
+		print("Finished solving feature %d..." % f)
+    		end = time.time()
+    		print('Solving one expected feature via LP, time = ' + str(end - start))
+    	return mu

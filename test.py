@@ -7,27 +7,31 @@ import pycuda.autoinit
 from pycuda.reduction import ReductionKernel
 import numba.cuda as cuda 
 from time import time
+import mdptoolbox
 
-dot = ReductionKernel(dtype_out=np.float32, neutral="0",
-                      reduce_expr="a+b", map_expr="x[i]*y[i]",
-                      arguments="float *x, float *y")
-n = 15000
-#x = curand((n), dtype=np.float32)
-#y = curand((n), dtype=np.float32)
+S = range(15000)
+A = range(5)
+R = np.random.randint(2, size = (len(S)))
 
-#x_cpu = gpuarray.to_gpu(np.random.random((n)))
-y_cpu = gpuarray.to_gpu(np.random.random((n)))
+T = list()
+scale = np.random.randint(100, size = (len(S), len(S)))
+for a in A:
+    T.append(sparse.bsr_matrix(np.dot(scale, np.random.randint(2, size = (len(S), len(S))))))
+    T[a] = sparse.diags(1.0/T[a].sum(axis = 1).A.ravel()).dot(T[a])  
+print("Transition for MDP finished")
 
-st = time()
-for i in range(n):
-	x_cpu = gpuarray.to_gpu(np.random.randint(2, size = (n)))
-	x_dot_y = dot(x_cpu, y_cpu).get()
-gpu_time = (time() - st)
-print "GPU: ", gpu_time
+policy = sparse.bsr_matrix(np.random.random([len(S), len(A)]).astype(float))
+print("Policy finished")
 
-st = time()
-x_cpu = sparse.csr_matrix(np.random.randint(2, size = (n, n)))
-x_dot_y_cpu = x_cpu.dot(y_cpu)
-cpu_time = (time() - st)
-print "CPU: ", cpu_time
-print "speedup: ", cpu_time/gpu_time
+P = T[0].dot(sparse.bsr_matrix(np.repeat(np.reshape(policy.T[0], [len(S), 1]), len(S), axis = 1)))
+for a in A[1:]:
+    P += T[a].dot(sparse.bsr_matrix(np.repeat(np.reshape(policy.T[a], [len(S), 1]), len(S), axis = 1)))
+P = sparse.diags(1.0/P.sum(axis = 1).A.ravel()).dot(P)
+print("Transition for DTMC finished")
+
+VL = mdptoolbox.mdp.ValueIteration(np.array(T), R, 0.99, 1e-5, 10000, initial_value = 0)
+VL.run()
+
+VL = mdptoolbox.mdp.ValueIteration(np.array([P]), R, 0.99, 1e-5, 10000, initial_value = 0)
+VL.run()
+

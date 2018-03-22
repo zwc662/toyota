@@ -375,6 +375,7 @@ class mdp:
 	
     def LP_features(self, epsilon = 1e-5, discount = 0.5):
     	self.P = self.P.todense()
+	assert self.P.shape == (len(self.S), len(self.S))
     	mu = []
     	for f in range(len(self.features[0])):
     		start = time.time()
@@ -384,14 +385,20 @@ class mdp:
     		G = list()
     		h = list()
     		for s in self.S:
-    			G_ = []
-    			for s_ in self.S:
-    				if s != s_: 
-    		 			G_.append(self.P[s, s_] * discount)
-    				else:
-    		 			G_.append(self.P[s, s_] * discount - 1.0)
-    			G.append(G_)
-    			h.append(-1.0 * np.dot(self.P[s], self.features.T[f]))
+    			#G_ = []
+    			#for s_ in self.S:
+    			#	if s != s_: 
+    		 	#		G_.append(self.P[s, s_] * discount)
+    			#	else:
+    		 	#		G_.append(self.P[s, s_] * discount - 1.0)
+    			#G.append(G_)
+			temp = np.zeros((len(self.S)))
+			temp[s] = 1
+			G_ = np.reshape(discount * (self.P[s] - temp), (1, len(self.S)))[0].tolist() 
+			print(len(G_[0]))
+			G.append(G_[0]) 
+			h_ = -1.0 * np.dot(self.P[s], self.features.T[f])[0, 0]
+    			h.append(h_)
 		print("Start solving feature %d..." % f)
     		sol = solvers.lp(matrix(c), matrix(G), matrix(h))
     		mu.append(np.array(sol['x']).reshape((len(self.S)))[-2])

@@ -5,19 +5,17 @@ import scipy as sci
 class discretizer:
 
     def __init__(self):
-        '''
-        self.grids = [5, 5, 2, 2, 5, 5, 5, 5, 3]  ##list of unit numbers in each dimension
         ##[front dist, rear dist, left, right, front speed, rear speed, left speed, right speed, lane pos]
         self.threshes = [
-                         [5, 10, 20, 25],#front dist
-                         [5, 10, 20, 25],#rear dist
+                         [5],#front dist
+                         [5],#rear dist
                          [1],#left
                          [1],#right
-                         [5, 10, 20, 30],#front speed
-                         [-30, -10, -20, -5],#rear speed
-                         [-30, -10, 10, 30],#left speed
-                         [-30, -10, 10, 30],#right speed
-                         [-42.0, -40.5],#lane pos
+                         [5],#front speed
+                         [-30],#rear speed
+                         [-30],#left speed
+                         [-30],#right speed
+                         [-42.0]#lane pos
                          ] ##list of threshes for each dimension
         '''
 
@@ -33,6 +31,7 @@ class discretizer:
                          [-5, 5],  # right speed
                          [-42.0, -40.5],  # lane pos
                          ]  # list of threshes for each dimension
+	'''
 
         self.grids = []
         for i in self.threshes:

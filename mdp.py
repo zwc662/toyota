@@ -1,4 +1,9 @@
 import numpy as np
+<<<<<<< HEAD
+from cvxopt import matrix, solvers
+from sklearn.preprocessing import normalize
+=======
+>>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
 import inspect
 from scipy import sparse
 from itertools import product
@@ -6,8 +11,30 @@ from multiprocessing import Pool
 import os
 import ast
 import time
+<<<<<<< HEAD
+import mdptoolbox
+from discretizer import discretizer
+from timeit import default_timer as timer
+from numba import vectorize
+from pycuda.curandom import rand as curand
+import pycuda.gpuarray as gpuarray
+import pycuda.driver as pycu
+import pycuda.autoinit
+from pycuda.reduction import ReductionKernel
+import numba.cuda as cuda 
+
+@vectorize(["float64(float64, float64)"], target='cuda')
+def VectorDot(a, b):
+	return a * b
+
+
+dot = ReductionKernel(dtype_out=np.float64, neutral="0",
+                      reduce_expr="a+b", map_expr="x[i]*y[i]",
+                      arguments="float *x, float *y")
+=======
 from discretizer import discretizer
 import mdptoolbox 
+>>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
 
 class mdp:
 
@@ -34,6 +61,10 @@ class mdp:
         self.unsafes = list()
         # A list of unsafe states
 	self.features = None
+<<<<<<< HEAD
+	self.reward = None
+=======
+>>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
 	# Features of all states
         self.discretizer = discretizer()
         # Include the discretizer as a member
@@ -157,6 +188,10 @@ class mdp:
 	    self.T[a] = sparse.bsr_matrix(self.T[a])
 	    self.T[a] = sparse.diags(1.0/self.T[a].sum(axis = 1).A.ravel()).dot(self.T[a])
 
+<<<<<<< HEAD
+
+=======
+>>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
     def set_policy(self, policy):
 	'''
         # Given policy, calculate self.P, the transition matrix of derived DTMC
@@ -173,12 +208,22 @@ class mdp:
         	self.policy = policy.todense()
 	else:
 		self.policy = policy
+<<<<<<< HEAD
+
+	assert self.policy.shape == (len(self.S), len(self.A))
+        self.P = sparse.csr_matrix(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
+        for a in range(len(self.A)):
+            self.P += self.T[a].dot(sparse.bsr_matrix(np.repeat(np.reshape(self.policy.T[a], [len(self.S), 1]), len(self.S), axis = 1 )))
+	self.P = sparse.diags(1.0/self.P.sum(axis = 1).A.ravel()).dot(self.P)
+
+=======
 
 	assert self.policy.shape == (len(self.S), len(self.A))
         self.P = sparse.csr_matrix(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
         for a in range(len(self.A)):
             self.P += self.T[a].dot(sparse.csr_matrix(np.repeat(np.reshape(self.policy.T[a], [len(self.S), 1]), len(self.S), axis = 1 )))
 	self.P = sparse.diags(1.0/self.P.sum(axis = 1).A.ravel()).dot(self.P)
+>>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
         print("DTMC transition constructed")
 
     def output(self):
@@ -279,6 +324,99 @@ class mdp:
         	while True:
             		itr += 1
 
+<<<<<<< HEAD
+    def value_iteration(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+		
+	#M = mdptoolbox.mdp.MDP(np.array(self.T), reward, discount, epsilon, max_iter)
+	VL = mdptoolbox.mdp.ValueIteration(np.array(self.T), self.reward, discount, epsilon, max_iter, initial_value = 0)
+	VL.run()
+	policy = np.zeros([len(self.S), len(self.A)]).astype(float)
+ 	for s in range(len(VL.policy)):
+		policy[s, VL.policy[s]] = 1.0
+	policy = sparse.csc_matrix(policy)
+	return policy
+		
+	
+    def expected_value(self, reward = None, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+	if reward is None:
+		reward = self.reward
+	itr = 0
+	value = reward
+	diff = float('inf')
+	self.P = self.P.todense()
+	while diff > epsilon:
+		itr += 1	
+		value_temp = value.copy()
+		#value = self.reward + discount * self.P.dot(value)
+		for s in self.S:
+			value[s] = reward[s] + discount * gpuarray.dot(gpuarray.to_gpu(self.P[s]), gpuarray.to_gpu(value)).get()
+			
+		var = (value[len(self.S) - 2] - value_temp[len(self.S) - 2])
+		diff = abs(var.max()) +  abs(var.min())
+		print("Iteration %d, difference is %f > error bound? %d" % (itr, diff, diff > epsilon))
+	return value[len(self.S)-2]
+
+    def QP(self, expert, features, epsilon = 1e-5):
+	assert expert.shape[-1] == np.array(features).shape[-1]
+
+	G_i = []
+	h_i = []
+		
+	for k in range(len(expert)):
+		G_i.append([0])	
+	G_i.append([-1])
+		#G_i = [[- (exp_mu[0] - mus[i][0])],
+		#	[- (exp_mu[1] - mus[i][1])],
+		#	[- (exp_mu[2] - mus[i][2])],
+		#	[- (exp_mu[3] - mus[i][3])]
+		#]
+	h_i = [0]
+	c = matrix(np.eye(len(expert) + 1)[-1] * -1)
+	for j in range(len(features)):
+		for k in range(len(expert)):
+			G_i[k].append( - expert[k] + features[j][k])	
+		G_i[len(expert)].append(1)
+			#G_i[0].append(-1 * mus[i][0] - (-1) * mus[j][0])
+			#G_i[1].append(-1 * mus[i][1] - (-1) * mus[j][1])
+			#G_i[2].append(-1 * mus[i][2] - (-1) * mus[j][2])
+			#G_i[3].append(-1 * mus[i][3] - (-1) * mus[j][3])
+		h_i.append(0)
+	for k in range(len(expert)):
+		G_i[k] = G_i[k] + [0.0] * (k + 1) + [-1.0] + [0.0] * (len(expert) + 1 - k - 1)
+	G_i[len(expert)] = G_i[len(expert)] + [0.0] * (1 + len(expert)) + [0.0]
+	h_i = h_i + [1] + (1 + len(expert)) * [0.0]
+		#G_i[0]= G_i[0] + [0., -1., 0., 0., 0., 0.]
+		#G_i[1]= G_i[1] + [0., 0., -1., 0., 0., 0.]
+		#G_i[2]= G_i[2] + [0., 0., 0., -1., 0., 0.]
+		#G_i[3]= G_i[3] + [0., 0., 0., 0., -1., 0.]
+		#G_i[4]= G_i[4] + [0., 0., 0., 0., 0., 0.,]
+		#h_i = h_i + [1., 0., 0., 0., 0., 0.]
+
+	G = matrix(G_i)
+	#	h = matrix([-1 * penalty, 1., 0., 0., 0.])
+	h = matrix(h_i)
+
+	dims = {'l': 1 + len(features), 'q': [len(expert) + 1, 1], 's': []}
+	start = time.time()
+	sol = solvers.conelp(c, G, h, dims)
+	end = time.time()
+	print("QP operation time = " + str(end - start))
+	print(sol.keys())
+	print sol['status']
+	solution = np.array(sol['x'])
+	if solution is not None:
+		solution=solution.reshape(len(expert) + 1)
+		w = solution[:-1]
+		t = solution[-1]
+	else:
+		w = None
+		t = None
+	
+	#solution = delta_mus[index]/np.linalg.norm(delta_mus[index], ord =2)
+	#delta_mu = np.linalg.norm(delta_mus[index], ord =2)  
+	return 0, w, t
+	
+=======
             		V_temp = V.copy()
 
             		# Bellman Operator: compute policy and value functions
@@ -293,3 +431,4 @@ class mdp:
                 		break
 		mu.append(V[-2])
 	return mu
+>>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43

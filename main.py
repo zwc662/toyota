@@ -1,14 +1,18 @@
 import numpy as np
 import time
 import scipy as sci
-from mdp import mdp
+import mdp
 from discretizer import discretizer
 import os
 import ast
 from preprocess import preprocess_dict, preprocess_list
+import scipy.sparse as sparse
 
 
+<<<<<<< HEAD
+=======
 
+>>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
 class run(object):
     def __init__(maxsize):
 	pass
@@ -23,6 +27,9 @@ class run(object):
         #preprocess_dict('/home/zekunzhou/workspace/toyota_project/data/data.json')
         preprocess_list('/home/zekunzhou/workspace/toyota_project/data/data.json')
         
+<<<<<<< HEAD
+        M = mdp.mdp()
+=======
         M = mdp()
         '''
         #Simple MDP for testing
@@ -38,6 +45,7 @@ class run(object):
         M.set_policy(policy)
         print(M.P)
         '''
+>>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
         
         M.build_from_discretizer(num_actions = 5)
         M.preprocess_list("/home/zekunzhou/workspace/toyota_project/data/demo")
@@ -56,11 +64,44 @@ class run(object):
         
      	M.output()
     	'''
+<<<<<<< HEAD
+	'''
+	M.reward = np.random.random([len(M.S), ]).astype(float)
+		
+=======
+>>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
         start = time.time()
 	policy = M.value_iteration()            
     	end = time.time()
 	print("Value iteration time: %f" % (end - start))
 
+<<<<<<< HEAD
+        M.set_policy(policy)
+	'''
+	M.P = np.random.random((len(M.S), len(M.S)))
+	M.P = sparse.csr_matrix(M.P)
+	M.P = sparse.diags(1.0/M.P.sum(axis = 1).A.ravel()).dot(M.P)
+	
+	start = time.time()
+	mu = []
+	for f in range(50):
+		mu.append(M.expected_value(reward = M.features[:, f]))
+    	end = time.time()
+	print("Policy iteration time: %f" % (end - start),)
+	print("Expected features")
+	print(mu)
+
+	M.features = []
+	mu = []
+	for f in range(50):
+		M.features.append(np.random.random([len(M.S)]))
+		mu.append(np.random.random([1]))
+	mu = np.reshape(mu, [50])
+	M.features = np.array(M.features).T.reshape([len(M.S), 50])
+	expert = M.features[-2]
+	_, theta, _ = M.QP(expert, [mu])
+
+=======
 
         M.set_policy(policy)
    	 
@@ -71,6 +112,7 @@ class run(object):
 	print("Policy iteration time: %f" % (end - start))
 
 	print(mu)
+>>>>>>> d59a1548e32979cb1ae4dc01ccdb7bc7e1afaf43
         exit()
     
         ##Use script to run PRISM, somehow doesn't work. Still working on it.

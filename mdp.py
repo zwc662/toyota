@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.optimize as optimize
 from cvxopt import matrix, solvers
 from sklearn.preprocessing import normalize
 import inspect
@@ -77,7 +78,7 @@ class mdp:
         # print(self.discretizer.grids)
         self.S = range(np.array(self.discretizer.grids).prod() + 2)
         # Add two external source
-        # print(len(self.S))
+        print(len(self.S))
         self.A = range(num_actions)
         print(len(self.A))
         self.T = []
@@ -296,6 +297,7 @@ class mdp:
 		itr = 0
 		VL.run()
 		mu.append(VL.V[-2])
+	return mu
 
     def expected_value(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
 	if type(self.P) is not type(self.T[0]):
@@ -373,34 +375,44 @@ class mdp:
 	
 	return 0, w, t
 	
+    def LP_value(self, epsilon = 1e-5, discount = 0.5):
+	if not isinstance(self.P, sparse.csr_matrix):
+		self.P = sparse.csr_matrix(self.P)
+	start = time.time()
+	c = np.ones((len(self.S)))
+    	A_ub = discount * self.P.transpose() - sparse.eye(len(self.S))
+	assert A_ub.shape == (len(self.S), len(self.S))
+	b_ub = -1 * self.reward
+	sol = optimize.linprog(c = c, A_ub = A_ub.todense(), b_ub = b_ub, method = 'simplex')
+	end = time.time()
+	print('Solving one expected value via sparse LP, time = %f' % (end - start))
+	return sol['x']
+	
+
+    def LP_value_(self, epsilon = 1e-5, discount = 0.5):
+    	self.P = self.P.todense()
+	assert self.P.shape == (len(self.S), len(self.S))
+    	start = time.time()
+    	c = np.ones((len(self.S))).tolist()
+    	G = (discount * self.P.T - np.eye(len(self.S))).tolist()
+    	h = (-1 * self.reward).tolist()
+    	sol = solvers.lp(matrix(c), matrix(G), matrix(h))
+    	end = time.time()
+    	print('Solving one expected value via LP, time = ' + str(end - start))
+	return sol['x']
+
     def LP_features(self, epsilon = 1e-5, discount = 0.5):
     	self.P = self.P.todense()
 	assert self.P.shape == (len(self.S), len(self.S))
     	mu = []
     	for f in range(len(self.features[0])):
     		start = time.time()
-    		c = list()
-    		for s in self.S:
-    			c.append(1.0)
-    		G = list()
-    		h = list()
-    		for s in self.S:
-    			#G_ = []
-    			#for s_ in self.S:
-    			#	if s != s_: 
-    		 	#		G_.append(self.P[s, s_] * discount)
-    			#	else:
-    		 	#		G_.append(self.P[s, s_] * discount - 1.0)
-    			#G.append(G_)
-			temp = np.zeros((len(self.S)))
-			temp[s] = 1
-			G_ = np.reshape(discount * (self.P[s] - temp), (1, len(self.S)))[0].tolist() 
-			G.append(G_[0]) 
-			h_ = -1.0 * np.dot(self.P[s], self.features.T[f])[0, 0]
-    			h.append(h_)
+    		c = np.ones((len(self.S))).tolist()
+    		G = (discount * self.P.T - np.eye(len(self.S))).tolist()
+    		h = (-1 * self.features[:, f]).tolist()
 		print("Start solving feature %d..." % f)
     		sol = solvers.lp(matrix(c), matrix(G), matrix(h))
-    		mu.append(np.array(sol['x']).reshape((len(self.S)))[-2])
+    		mu.append(np.array(sol['x']).reshape((len(self.S))))
 		print("Finished solving feature %d..." % f)
     		end = time.time()
     		print('Solving one expected feature via LP, time = ' + str(end - start))

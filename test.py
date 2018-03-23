@@ -60,7 +60,7 @@ class run:
 def trans(M):
     p = Pool(len(M.A))
     p.map(M.MDP_trans, M.A)
-    print("Transition for action %d finished" % a)
+    print("Transition for action %d finished" % 1)
 
     p.map(M.DTMC_trans, M.A)
     M.P = sparse.diags(1.0/M.P.sum(axis = 1).A.ravel()).dot(M.P)

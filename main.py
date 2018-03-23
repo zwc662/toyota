@@ -33,6 +33,11 @@ class run(object):
 
 	M.reward = np.random.random([len(M.S), ]).astype(float)
 		
+	start = time.time()
+	_, w, _ = M.QP(np.random.random((10)), np.random.random((10, 10)))
+    	end = time.time()
+	print("QP time: %f" % (end - start))
+
         start = time.time()
 	policy = M.value_iteration()            
     	end = time.time()
@@ -41,13 +46,22 @@ class run(object):
         M.set_policy(policy)
 
 	start = time.time()
-	mu = M.expected_value()
+	v = M.expected_value()
 	#mu = M.LP_features()
     	end = time.time()
 	print("Policy iteration time: %f" % (end - start),)
+	print(v[-2])
 
-        exit()
+
+	start = time.time()
+	v_ = M.LP_value()
+	end = time.time()
+	print("LP time: %f" % (end - start))
+	print(v[-2])
+	#mu = M.LP_features()
+
     
+        exit()
         ##Use script to run PRISM, somehow doesn't work. Still working on it.
         os.system('/home/zekunzhou/workspace/toyota_project/prism-4.4.beta-src/src/demos/run /home/zekunzhou/workspace/toyota_project/')
         os.system('/home/zekunzhou/workspace/toyota_project/prism-4.4.beta-src/bin/prism ./grid_world.pm ./grid_world.pctl')

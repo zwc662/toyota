@@ -5,8 +5,9 @@ import scipy as sci
 class discretizer:
 
     def __init__(self):
-	'''
         ##[front dist, rear dist, left, right, front speed, rear speed, left speed, right speed, lane pos]
+
+	'''
         self.threshes = [
                          [5],#front dist
                          [5],#rear dist
@@ -32,7 +33,6 @@ class discretizer:
                          [-5, 5],  # right speed
                          [-42.0, -40.5],  # lane pos
                          ]  # list of threshes for each dimension
-
         self.grids = []
         for i in self.threshes:
             # number of intervals in each dimension

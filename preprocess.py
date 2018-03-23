@@ -4,6 +4,7 @@ def preprocess_dict(path):
     file = open(path, 'r')
     dic = json.load(file)
     
+    '''
     print(len(dic['Front Distance']))
     print(len(dic['Rear Distance']))
     print(len(dic['Left']))
@@ -14,7 +15,8 @@ def preprocess_dict(path):
     print(len(dic['Right Velocity']))
     print(len(dic['Lane Position']))
     print(len(dic['Action']))
-    
+    '''
+
     time = 0
     trajectory = -1
     demo = {}
@@ -61,7 +63,8 @@ def preprocess_dict(path):
 def preprocess_list(path):
     file = open(path, 'r')
     dic = json.load(file)
-    
+
+    '''    
     print(len(dic['Front Distance']))
     print(len(dic['Rear Distance']))
     print(len(dic['Left']))
@@ -72,7 +75,8 @@ def preprocess_list(path):
     print(len(dic['Right Velocity']))
     print(len(dic['Lane Position']))
     print(len(dic['Action']))
-    
+    '''
+
     time = 0
     trajectory = -1
     demo = []

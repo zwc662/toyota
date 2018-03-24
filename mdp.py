@@ -274,7 +274,7 @@ class mdp:
         file.close()
 
 		
-    def expected_features_(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+    def expected_features_manual(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
 	itr = 0
 	mu_temp = self.features
 	diff = float('inf')
@@ -285,8 +285,8 @@ class mdp:
 		print("Iteration %d, difference is %f" % (itr, diff))
 		mu = mu_temp
 		mu_temp = self.features + discount * (self.P.dot(mu))
+                diff = (abs((mu_temp - mu).max()) + abs((mu_temp - mu).min()))/2
 			
-		diff = np.linalg.norm((mu_temp[len(self.S) - 2] - mu[len(self.S) - 2]), ord = 2)/discount
 	return mu[len(self.S)-2]/discount
 	
     def expected_features(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
@@ -298,6 +298,21 @@ class mdp:
 		VL.run()
 		mu.append(VL.V[-2])
 	return mu
+
+    def expected_value_manual(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+        itr = 0
+        v_temp = self.reward
+	if type(self.P) is not type(self.T[0]):
+		self.P = type(self.T[0])(self.P)
+        diff = float('inf')
+        while diff > epsilon:
+            itr += 1
+	    print("Iteration %d, difference is %f" % (itr, diff))
+	    v = v_temp
+	    v_temp = self.reward + discount * (self.P.dot(v))
+            diff = (abs((v_temp - v).max()) + abs((v_temp - v).min()))/2
+        return v
+			
 
     def expected_value(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
 	if type(self.P) is not type(self.T[0]):
@@ -318,7 +333,7 @@ class mdp:
 	return policy
 		
 	
-    def expected_value_(self, reward = None, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+    def expected_value_gpu(self, reward = None, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
 	if reward is None:
 		reward = self.reward
 	itr = 0
@@ -386,7 +401,7 @@ class mdp:
 	sol = optimize.linprog(c = c, A_ub = A_ub.todense(), b_ub = b_ub, method = 'simplex')
 	end = time.time()
 	print('Solving one expected value via sparse LP, time = %f' % (end - start))
-	return sol['x']
+	return np.reshape(np.array(sol['x']), (len(self.S)))
 	
 
     def LP_value_(self, epsilon = 1e-5, discount = 0.5):
@@ -399,7 +414,7 @@ class mdp:
     	sol = solvers.lp(matrix(c), matrix(G), matrix(h))
     	end = time.time()
     	print('Solving one expected value via LP, time = ' + str(end - start))
-	return sol['x']
+	return np.reshape(np.array(sol['x']), (len(self.S)))
 
     def LP_features(self, epsilon = 1e-5, discount = 0.5):
     	self.P = self.P.todense()

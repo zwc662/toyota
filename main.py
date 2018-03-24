@@ -49,14 +49,23 @@ class run(object):
 	v = M.expected_value()
 	#mu = M.LP_features()
     	end = time.time()
-	print("Policy iteration time: %f" % (end - start),)
+	print("Policy iteration time: %f" % (end - start))
 	print(v[-2])
 
+        '''
+	start = time.time()
+	v = M.expected_value_manual()
+	#mu = M.LP_features()
+    	end = time.time()
+	print("Policy iteration time: %f" % (end - start))
+	print(v[-2])
+        '''
 
 	start = time.time()
-	v_ = M.LP_value()
+	v = M.LP_value_()
 	end = time.time()
 	print("LP time: %f" % (end - start))
+        print(v)
 	print(v[-2])
 	#mu = M.LP_features()
 

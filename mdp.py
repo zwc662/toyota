@@ -70,6 +70,8 @@ class mdp:
         for a in range(len(self.A)):
             self.T.append(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
         # Init transition matrices to be all zero
+	self.set_features()
+        print("construction complete")
 
     def build_from_discretizer(self, discretizer=None, num_actions=None):
         # Given a discretizer, build the MDP
@@ -188,7 +190,7 @@ class mdp:
         # Give value to self.T
 	self.T = list()
         for a in range(len(self.A)):
-	    self.T.append(100 * np.random.randint(2, size= (len(self.S), len(self.S))))
+	    self.T.append(sparse.random(len(self.S), len(self.S), density = 0.1).todense())
             for s in range(len(self.S)):
                 tot = np.sum(self.T[a][s])
                 if tot == 0.0:
@@ -196,19 +198,17 @@ class mdp:
 	    self.T[a] = sparse.bsr_matrix(self.T[a])
 	    self.T[a] = sparse.diags(1.0/self.T[a].sum(axis = 1).A.ravel()).dot(self.T[a])
 
+    def set_policy_random(self):
+        self.policy = np.random.random((len(self.S), len(self.A))) 
+        self.P = sparse.bsr_matrix(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
+        for a in range(len(self.A)):
+            self.P += self.T[a].dot(sparse.bsr_matrix(np.repeat(np.reshape(self.policy.T[a], [len(self.S), 1]), len(self.S), axis = 1 )))
+	self.P = sparse.diags(1.0/self.P.sum(axis = 1).A.ravel()).dot(self.P)
+        
+        print("DTMC transition constructed")
+
 
     def set_policy(self, policy):
-	'''
-        # Given policy, calculate self.P, the transition matrix of derived DTMC
-        if - policy.sum(axis=1) + np.ones([len(self.S)]) >= np.spacing(0, dtype = np.float16):
-            polcy = policy + ((np.ones([len(self.S)]).astype(np.float64) - policy.sum(axis=1))/len(self.A)).reshape([len(self.S), 1])
-        else:
-            #raise ValueError("policy action distribution sum larger than 1.0")
-            print("policy action distribution sum larger than 1.0")
-            policy_ = np.sum(
-                policy, axis=1).reshape([len(self.S),1]).astype(np.float64)
-            policy = policy / policy_
-	'''
 	if isinstance(policy, sparse.csr_matrix) or isinstance(policy, sparse.csc_matrix):
         	self.policy = policy.todense()
 	else:

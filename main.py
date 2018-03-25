@@ -25,11 +25,15 @@ class run(object):
         
         M = mdp.mdp()
         
+        '''
         M.build_from_discretizer(num_actions = 5)
         M.preprocess_list("/home/zekunzhou/workspace/toyota_project/data/demo")
         M.set_transitions("/home/zekunzhou/workspace/toyota_project/data/transitions")
-
-	#M.set_transitions_random()
+        '''
+	
+        M.build_from_config(15000, 5) 
+        M.set_transitions_random()  
+        M.set_policy_random()
 
 	M.reward = np.random.random([len(M.S), ]).astype(float)
 		

@@ -1,0 +1,32 @@
+data 		- 		raw data consisting of 
+				Data storage format -- Pos.x (x - direction) Pos.y Pos.z Steering angle Velocity carstate
+				notice that Pos.y is useless
+				left lane is between [-43, -42.5] and the right lane is between [-40.5, -39.5]. 
+
+car1_data 	- 		raw data of car 1 
+car2_data 	- 		raw data of car 2 
+car3_data 	- 		raw data of car 3
+
+JointStates 	- 	the encoded states where each coordinate are specified as follows:
+	Coordinate 1 - 3: the distance with respect to the right lane, where 0 means at the right lane, 1 in the middle and 2 means that the left lane.
+	Coordinate 4: 	  the order of vehicles where each of the numbers represent 
+				    % 1 2 3 --> 0     % 1 3 2 --> 4     % 2 1 3 --> 2     % 2 3 1 --> 3     % 3 1 2 --> 5    % 3 2 1 --> 7
+	Coordinate 5 - 7: the encoded gaps between car1 car2, car1 car3, and car2 car3 respectively. The quantization levels are specified by  [5; 10; 15; 25]
+				i.e., 0 - 5 --> 1, 5 - 10 --> 2, ...., 25+ --> 5
+	Coordinate 8 - 10: the velocity of vehicles. Discretized into 4 levels intotal.
+
+JointActs 	- 	the joint actions of three vehicles where the actions are encoded as follows. In particular, we use Quinary number system to represent the actions. 
+		For example, state 0 (base 10) in JointActs represents 000 in base 5 representations. 
+		%  slow down  maintain    accelerate    slide left   slide right
+		%      0         1           2              3             4
+		Please, see Individual_actions for more details
+
+Param		- 	The set of parameters
+P		- 	The transition probabilities where Pr(s' | s, a) in the markov chain can be computed by P(s, s', a) provided that s and s' are the states observable from data
+Pa		-	The action execution probability, computed by counting the actions executed at the same state s (from the data). 
+
+
+			
+
+
+

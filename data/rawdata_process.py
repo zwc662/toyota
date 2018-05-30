@@ -28,16 +28,19 @@ def relative_value(car1, car2, car3):
     gap3 = car3 - car1
     return gap2, gap3
 
-def relative_position(gap2, gap3):
+def relative_position_(gap2, gap3):
     rel_position = np.zeros(8)
     
+    #Same lane in the front
     if gap2[2]>=0 and abs(gap2[0])<= 2:
         rel_position[0] = 1
+    #Same lane behind
     elif gap2[2]<=0 and abs(gap2[0])<= 2:
         rel_position[1] = 1
-    
+    #Left lane in the [-10, 10] zone
     if gap2[0]>2 and gap2[0]<4 and abs(gap2[2])<= 10:
         rel_position[2] = 1
+    #Right lane in the [-10, 10] zone
     elif gap2[0]<-2 and gap2[0]>-4 and abs(gap2[2])<= 10:
         rel_position[3] = 1
         
@@ -51,6 +54,34 @@ def relative_position(gap2, gap3):
     elif gap3[0]<-2 and gap3[0]>-4 and abs(gap3[2])<= 10:
         rel_position[7] = 1  
     return rel_position
+
+def relative_position(gap2, gap3):
+    rel_position = np.zeros(8)
+    
+    #In the front
+    if gap2[2]>=0:
+        rel_position[0] = 1
+    #behind
+    elif gap2[2]<=0:
+        rel_position[1] = 1
+    #Left lane
+    if gap2[0]>2 and gap2[0]<4:
+        rel_position[2] = 1
+    #Right lane
+    elif gap2[0]<-2 and gap2[0]>-4:
+        rel_position[3] = 1
+    
+    if gap3[2]>=0:
+        rel_position[4] = 1
+    elif gap3[2]<=0:
+        rel_position[5] = 1
+    
+    if gap3[0]>2 and gap3[0]<4:
+        rel_position[6] = 1
+    elif gap3[0]<-2 and gap3[0]>-4:
+        rel_position[7] = 1
+    return rel_position
+
 
 def around(rel_position, gap2, gap3):
     dis = Neighbor()

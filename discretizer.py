@@ -72,7 +72,7 @@ class discretizer:
                 coord[i] = len(self.threshes[i])
         return coord.tolist()
 
-    def build_transitions(self, path = './data/data_v1', freq = 20):
+    def build_transitions(self, path = './data/data', freq = 20):
         # Preprocess the data set file which contains trajectories
         # Each trajectory is a list in which each element in a list is a list of time step, dict of observations and ...
         # This method translates the observations to coords
@@ -118,19 +118,20 @@ class discretizer:
             last_tuple = [i for i in tuple]
             
             tuples.append(
-                          (str(index) +
-                           ' ' +
+                          ('[' +
+                           str(index) +
+                           ', ' +
                            str(coord) +
-                           ' ' +
+                           ', ' +
                            str(action) +
-                           ' ' +
+                           ', ' +
                            str(coord_) +
-                           '\n'))
+                           ']\n'))
             index += 1
 
         file_i.close()
         
-        file_o = open('./data/demo_v1', 'w')
+        file_o = open('./data/demo', 'w')
         for line_str in tuples:
             file_o.write(line_str)
         file_o.close()

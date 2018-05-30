@@ -21,57 +21,57 @@ class run(object):
 
     def main(self):
         #preprocess_dict('/home/zekunzhou/workspace/toyota_project/data/data.json')
-        preprocess_list('/home/zekunzhou/workspace/toyota_project/data/data.json')
+        #preprocess_list('/home/zekunzhou/workspace/toyota_project/data/data.json')
         
         M = mdp.mdp()
         
-        '''
-        M.build_from_discretizer(num_actions = 5)
-        M.preprocess_list("/home/zekunzhou/workspace/toyota_project/data/demo")
-        M.set_transitions("/home/zekunzhou/workspace/toyota_project/data/transitions")
-        '''
+        
+        M.build_from_discretizer(num_actions = 2 * 3)
+        M.preprocess_list()
+        M.set_transitions()
+        
 	
-        M.build_from_config(15000, 5) 
-        M.set_transitions_random()  
-        M.set_policy_random()
+        #M.build_from_config(15000, 5)
+        #M.set_transitions_random()
+        #M.set_policy_random()
 
-	M.reward = np.random.random([len(M.S), ]).astype(float)
-		
-	start = time.time()
-	_, w, _ = M.QP(np.random.random((10)), np.random.random((10, 10)))
-    	end = time.time()
-	print("QP time: %f" % (end - start))
+        M.reward = np.random.random([len(M.S), ]).astype(float)
+        
+        start = time.time()
+        _, w, _ = M.QP(np.random.random((10)), np.random.random((10, 10)))
+        end = time.time()
+        print("QP time: %f" % (end - start))
 
         start = time.time()
-	policy = M.value_iteration()            
-    	end = time.time()
-	print("Value iteration time: %f" % (end - start))
+        policy = M.value_iteration()
+        end = time.time()
+        print("Value iteration time: %f" % (end - start))
 
         M.set_policy(policy)
 
-	start = time.time()
-	v = M.expected_value()
-	#mu = M.LP_features()
-    	end = time.time()
-	print("Policy iteration time: %f" % (end - start))
-	print(v[-2])
+        start = time.time()
+        v = M.expected_value()
+        #mu = M.LP_features()
+        end = time.time()
+        print("Policy iteration time: %f" % (end - start))
+        print(v[-2])
 
         '''
-	start = time.time()
-	v = M.expected_value_manual()
-	#mu = M.LP_features()
-    	end = time.time()
-	print("Policy iteration time: %f" % (end - start))
-	print(v[-2])
+        start = time.time()
+        v = M.expected_value_manual()
+        #mu = M.LP_features()
+            end = time.time()
+        print("Policy iteration time: %f" % (end - start))
+        print(v[-2])
         '''
 
-	start = time.time()
-	v = M.LP_value_()
-	end = time.time()
-	print("LP time: %f" % (end - start))
+        start = time.time()
+        v = M.LP_value_()
+        end = time.time()
+        print("LP time: %f" % (end - start))
         print(v)
-	print(v[-2])
-	#mu = M.LP_features()
+        print(v[-2])
+        #mu = M.LP_features()
 
     
         exit()

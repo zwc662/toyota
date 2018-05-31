@@ -69,7 +69,7 @@ class apirl(mdp, object):
         self.reward = np.reshape(np.dot(self.features, theta), (len(self.S), ))
         self.policy = self.value_iteration()
         self.set_policy(self.policy)
-        mu = self.expected_features() 
+        mu = self.expected_features_manual() 
         return mu, self.policy
 
     def random_demo(self):

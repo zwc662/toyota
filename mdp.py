@@ -426,7 +426,7 @@ class mdp:
             w = None
             t = None
         
-        return 0, w, t
+        return w, t
 	
     def LP_value(self, epsilon = 1e-5, discount = 0.5):
         if epsilon is not 1e-5:

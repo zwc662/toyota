@@ -34,14 +34,14 @@ class discretizer:
         '''
         self.threshes = [
                      [-41],  # car1 lane position
-                     [0, 10, 20, 30, 40],  # car1 velocity
+                     [0, 20, 40],  # car1 velocity
                 
                      [-41],  # car2 lane
-                     [-30, -10, -3, 3, 10, 30],  # car2 distance
+                     [-30, -10, 10, 30],  # car2 distance
                      [-10, 0, 10],  # car2 speed
                          
                      [-41],  # car3 lane
-                     [-30, -10, -3, 3, 10, 30],  # car3 distance
+                     [-30, -10, 10, 30],  # car3 distance
                      [-10, 0, 10],  # car3 speed
                      ]  # list of threshes for each dimension
         self.grids = []

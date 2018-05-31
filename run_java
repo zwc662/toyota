@@ -1,0 +1,13 @@
+#!/bin/sh
+SHARED_LIB="/share/ibm/ILOG/CPLEX_Studio1271/cplex/lib/x86-64_linux/static_pic"
+CLASSPATH="/share/ibm/ILOG/CPLEX_Studio1271/cplex/lib/"
+if [ "$CPLEX_JAVA" = "" ]; then
+	# On OS X, we want to avoiding calling java from the /usr/bin link
+	# since it causes problems with dynamic linking (DYLD_LIBRARY_PATH)
+	if [ -x /usr/libexec/java_home ]; then
+		CPLEX_JAVA=`/usr/libexec/java_home`"/bin/java"
+	else
+		CPLEX_JAVA=java
+	fi
+fi
+"$CPLEX_JAVA" -Djava.library.path="$SHARED_LIB" -classpath "$CLASSPATH" $1 "$@"

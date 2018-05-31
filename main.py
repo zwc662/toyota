@@ -2,11 +2,13 @@ import numpy as np
 import time
 import scipy as sci
 import mdp
+import apirl
 from discretizer import discretizer
 import os
 import ast
 from preprocess import preprocess_dict, preprocess_list
 import scipy.sparse as sparse
+
 
 
 class run(object):
@@ -23,14 +25,16 @@ class run(object):
         #preprocess_dict('/home/zekunzhou/workspace/toyota_project/data/data.json')
         #preprocess_list('/home/zekunzhou/workspace/toyota_project/data/data.json')
         
-        M = mdp.mdp()
+        #M = mdp.mdp()
         
+	M = apirl.apirl()
         
         M.build_from_discretizer(num_actions = 2 * 3)
         M.preprocess_list()
         M.set_transitions()
         
-	
+        M.run(max_iter = 50)
+
         #M.build_from_config(15000, 5)
         #M.set_transitions_random()
         #M.set_policy_random()

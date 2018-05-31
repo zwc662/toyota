@@ -51,6 +51,8 @@ class mdp:
         # A list of unsafe states
         self.features = None
         self.reward = None
+        self.discount = 0.99
+        self.epsilon = 1E-5
         # Features of all states
         self.discretizer = discretizer()
         # Include the discretizer as a member
@@ -145,7 +147,7 @@ class mdp:
         print("read list file")
         for line_str in file_i.readlines():
             line = ast.literal_eval(line_str)
-            
+            time = line[0]    
             coord= line[1]
             state = self.coord_to_state(coord)
             
@@ -156,7 +158,9 @@ class mdp:
             state_ = self.coord_to_state(coord_)
             
             tuples.append(
-                (str(state) +
+                (str(time) + 
+                 ' ' +
+                 str(state) +    
                  ' ' +
                  str(action) +
                     ' ' +
@@ -176,9 +180,9 @@ class mdp:
         file = open(str(transitions), 'r')
         for line_str in file.readlines():
             line = line_str.split('\n')[0].split(' ')
-            a = int(float(line[1]))
-            s = int(float(line[0]))
-            s_ = int(float(line[2]))
+            a = int(float(line[2]))
+            s = int(float(line[1]))
+            s_ = int(float(line[3]))
             self.T[a][s, s_] += 1
         file.close()
         for a in range(len(self.A)):
@@ -281,11 +285,15 @@ class mdp:
 
 		
     def expected_features_manual(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+        if epsilon is not 1e-5:
+            self.epsilon = epsilon
+        if discount is not 0.99:
+            self.discount = discount
         itr = 0
         mu_temp = self.features
         diff = float('inf')
-        assert self.P.shape[1] == features.shape[0]
-        assert self.P.shape[0] == features.shape[0]
+        assert self.P.shape[1] == self.features.shape[0]
+        assert self.P.shape[0] == self.features.shape[0]
         while diff > epsilon:
             itr += 1
             print("Iteration %d, difference is %f" % (itr, diff))
@@ -296,6 +304,11 @@ class mdp:
         return mu[len(self.S)-2]/discount
 	
     def expected_features(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+        if epsilon is not 1e-5:
+            self.epsilon = epsilon
+
+        if discount is not 0.99:
+            self.discount = discount
         mu = []
         for f in range(self.features.shape[-1]):
             V = self.features[:, f].reshape(len(self.S))
@@ -306,6 +319,11 @@ class mdp:
         return mu
 
     def expected_value_manual(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+
+        if epsilon is not 1e-5:
+            self.epsilon = epsilon
+        if discount is not 0.99:
+            self.discount = discount
         itr = 0
         v_temp = self.reward
         if type(self.P) is not type(self.T[0]):
@@ -321,6 +339,10 @@ class mdp:
 
 
     def expected_value(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+        if epsilon is not 1e-5:
+            self.epsilon = epsilon
+        if discount is not 0.99:
+            self.discount = discount
         if type(self.P) is not type(self.T[0]):
             self.P = type(self.T[0])(self.P)
         VL = mdptoolbox.mdp.ValueIteration(np.array([self.P]), self.reward, discount, epsilon, max_iter, initial_value = 0)
@@ -329,6 +351,10 @@ class mdp:
         return VL.V
 
     def value_iteration(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+        if epsilon is not 1e-5:
+            self.epsilon = epsilon
+        if discount is not 0.99:
+            self.discount = discount
         #M = mdptoolbox.mdp.MDP(np.array(self.T), reward, discount, epsilon, max_iter)
         VL = mdptoolbox.mdp.ValueIteration(np.array(self.T), self.reward, discount, epsilon, max_iter, initial_value = 0)
         VL.run()
@@ -340,6 +366,10 @@ class mdp:
 		
 	
     def expected_value_gpu(self, reward = None, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+        if epsilon is not 1e-5:
+            self.epsilon = epsilon
+        if discount is not 0.99:
+            self.discount = discount
         if reward is None:
             reward = self.reward
         itr = 0
@@ -359,6 +389,8 @@ class mdp:
         return value[len(self.S)-2]
 
     def QP(self, expert, features, epsilon = 1e-5):
+        if epsilon is not 1e-5:
+            self.epsilon = epsilon
         assert expert.shape[-1] == np.array(features).shape[-1]
         G_i = []
         h_i = []
@@ -397,6 +429,10 @@ class mdp:
         return 0, w, t
 	
     def LP_value(self, epsilon = 1e-5, discount = 0.5):
+        if epsilon is not 1e-5:
+            self.epsilon = epsilon
+        if discount is not 0.99:
+            self.discount = discount
         if not isinstance(self.P, sparse.csr_matrix):
             self.P = sparse.csr_matrix(self.P)
         start = time.time()
@@ -411,6 +447,10 @@ class mdp:
     
 
     def LP_value_(self, epsilon = 1e-5, discount = 0.5):
+        if epsilon is not 1e-5:
+            self.epsilon = epsilon
+        if discount is not 0.99:
+            self.discount = discount
     	self.P = self.P.todense()
         assert self.P.shape == (len(self.S), len(self.S))
     	start = time.time()
@@ -423,6 +463,10 @@ class mdp:
         return np.reshape(np.array(sol['x']), (len(self.S)))
 
     def LP_features(self, epsilon = 1e-5, discount = 0.5):
+        if epsilon is not 1e-5:
+            self.epsilon = epsilon
+        if discount is not 0.99:
+            self.discount = discount
     	self.P = self.P.todense()
         assert self.P.shape == (len(self.S), len(self.S))
     	mu = []

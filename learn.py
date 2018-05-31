@@ -20,14 +20,17 @@ import pycuda.driver as pycu
 import pycuda.autoinit
 from pycuda.reduction import ReductionKernel
 import numba.cuda as cuda 
-
+import sys
 from discretizer import discretizer
 import mdptoolbox 
 
 
-class learn(mdp):
+class learn(mdp, object):
     def __init__(self):
-        super().__init__()
+        if sys.version_info[0] >= 3: 
+            super().__init__()
+        else:
+            super(learn, self).__init__()
         
         
     def expected_features_manual(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):

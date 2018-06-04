@@ -1,40 +1,29 @@
 import numpy as np
+import random
 import scipy.optimize as optimize
 from cvxopt import matrix, solvers
-from sklearn.preprocessing import normalize
-import inspect
 from scipy import sparse
-from itertools import product
-from multiprocessing import Pool
 import os
 import ast
 import time
 import mdptoolbox
-from discretizer import discretizer
-from timeit import default_timer as timer
-from numba import vectorize
-#from pycuda.curandom import rand as curand
-#import pycuda.gpuarray as gpuarray
-#import pycuda.driver as pycu
-#import pycuda.autoinit
-#from pycuda.reduction import ReductionKernel
-#import numba.cuda as cuda
-
-from discretizer import discretizer
+import math
 import mdptoolbox 
 
 
-
-class mdp:
-
-    def __init__(self):
-        self.S = list()
+class mdp():
+    def __init__(self, num_S = None, num_A = None):
+        if num_S is None or (num_A is None):
+            self.input()
+            num_S = len(self.S)
+            num_A = len(self.A)
+        self.S = range(num_S)
         # Always add two extra states at the end
         # S[-1] is the single unsafe terminal and S[-2] is the sngle initial terminal
         # All unsafe states have probability 1 to reach the unsafe terminal
         # From initial terminal there is a distribution of transiting to the
         # initial states
-        self.A = list()
+        self.A = range(num_A)
         # List of actions
         self.T = None
         # A list of numpy transition matrices for each actions
@@ -49,149 +38,106 @@ class mdp:
         # A list of initial states
         self.unsafes = list()
         # A list of unsafe states
+        self.theta = None
         self.features = None
-        self.reward = None
-        self.discount = 0.99
-        self.epsilon = 1E-5
         # Features of all states
-        self.discretizer = discretizer()
-        # Include the discretizer as a member
+        self.rewardss = None
+        # Rewards of all states
+        self.epsilon = 1e-5
+        self.max_iter = 10000
+        self.discount = 0.99
 
-    def build_from_config(self, num_states, num_actions):
-        # Only have the number of states and actions, build the MDP
-        self.S = range(num_states + 2)  # Add two external source
-        self.A = range(num_actions)
-        self.T = []
-        for a in range(len(self.A)):
-            self.T.append(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
-        # Init transition matrices to be all zero
-        self.set_features()
-        print("construction complete")
 
-    def build_from_discretizer(self, discretizer=None, num_actions=None):
-        # Given a discretizer, build the MDP
-        if discretizer is not None:
-            self.discretizer = discretizer
-        # print(self.discretizer.grids)
-        self.S = range(np.array(self.discretizer.grids).prod() + 2)
-        # Add two external source
-        print(len(self.S))
-        self.A = range(num_actions)
-        print(len(self.A))
-        self.T = []
-        for a in range(len(self.A)):
-            self.T.append(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
-        # Init transition matricies to be all zero
-        self.set_features()
-        print("construction complete")
-
-    def set_starts(self, starts):
+    def set_initial_transitions(self, starts = None, distribution = None):
         # Set uniform distribution of starting from each initial states
-        self.starts = starts
+        if starts is None:
+            starts = self.starts
+
         for a in range(len(self.A)):
             self.T[a][:, self.S[-2]] = self.T[a][:, self.S[-2]] * 0.0
             self.T[a][self.S[-2]] = self.T[a][self.S[-2]] * 0.0
 
-            self.T[a][:, self.starts] = self.T[a][:, self.starts] * 0.0
-            self.T[a][self.S[-2], self.starts] = 1.0/len(self.starts)
+            if distribution is None:
+                for s in self.starts:
+                    self.T[a][self.S[-2], s] = 1.0/len(starts)
+            else:
+                for s in self.S:
+                    self.T[a][self.S[-2], s] = distribution[s]
+        
 
-    def set_targets(self, targets):
+    def set_targets_transitions(self, targets = None):
         # Set target states to be absorbing
-        self.targets = targets
+        if targets is None:
+            targets = self.targets
         for a in range(len(self.A)):
-            self.T[a][self.targets] = self.T[a][self.targets] * 0.0
-            self.T[a][self.targets, self.targets] = 1.0
+            for t in targets:
+                self.T[a][t] = self.T[a][t] * 0.0
+                self.T[a][t, t] = 1.0
 
-    def set_unsafes(self, unsafes):
+    def set_unsafes_transitions(self, unsafes = None):
         # Set all probabilities of transitioning from unsafe states to unsafe
         # terminal to be 1
-        self.unsafes = unsafes
+        if unsafes is None:
+            unsafes = self.unsafes
 
         for a in range(len(self.A)):
             self.T[a][:, self.S[-1]] = self.T[a][:, self.S[-1]] * 0.0
             self.T[a][self.S[-1]] = self.T[a][self.S[-1]] * 0.0
             self.T[a][self.S[-1], self.S[-1]] = 1.0
+            for u in unsafes:
+                self.T[a][u] = self.T[a][u] * 0.0
+                #self.T[a][u, self.S[-1]] = 1.0
+                self.T[a][u, u] = 1.0
 
-            self.T[a][self.unsafes] = self.T[a][self.unsafes] * 0.0
-            self.T[a][self.unsafes, self.S[-1]] = 1.0
+    def set_features(self, num_features = 50): 
+        self.features = (np.zeros([len(self.S),num_features]).astype(np.float16))      
+        centroids = list()
+        for i in range(num_features):
+            centroids.append(i * len(self.S)/num_features)
+            self.features[:, i] = [math.exp(-abs(j - centroids[-1]) * num_features/len(self.S)) for j in self.S]   
+	self.features[-2] = 0.0 * self.features[-2]
+        self.features[-1] = 0.0 * self.features[-1]
+        print("Feature set up")  
 
-    def set_features(self):
-        self.features = (np.random.random(size = [len(self.S),50]).astype(np.float64))
 
-    def observation_to_state(self, observation):
-        # Translate observation to coordinate by calling the discretizer
-        # Then translate the coordinate to state
-        coord = self.discretizer.observation_to_coord(observation)
-        state = self.coord_to_state(self, coord)
-        return state
-
-    def coord_to_state(self, coord):
-        state = coord[0]
-        for i in range(1, len(coord)):
-            state_temp = coord[i]
-            for j in range(0, i):
-                state_temp *= self.discretizer.grids[j]
-            state += state_temp
-        return state
-            
-    def coord_to_action(self, coord):
-        action = coord[0] + 2 * coord[1]
-        return action
-
-    def preprocess_list(self, path = './data/demo'):
-        # Preprocess the data set file which contains trajectories
-        # Each trajectory is a list in which each element in a list is a list of time step, dict of observations and ...
-        # This method translates the observations to states
-        tuples = []
-        file_i = open(path, 'r')
-        print("read list file")
-        for line_str in file_i.readlines():
-            line = ast.literal_eval(line_str)
-            time = line[0]    
-            coord= line[1]
-            state = self.coord_to_state(coord)
-            
-            action_coord = line[2]
-            action = self.coord_to_action(action_coord)
-            
-            coord_ = line[3]
-            state_ = self.coord_to_state(coord_)
-            
-            tuples.append(
-                (str(time) + 
-                 ' ' +
-                 str(state) +    
-                 ' ' +
-                 str(action) +
-                    ' ' +
-                    str(state_) +
-                    '\n'))
-        file_i.close()
-
-        file_o = open('./data/trans', 'w')
-        for line_str in tuples:
-            file_o.write(line_str)
-        file_o.close()
-
-    def set_transitions(self, transitions = './data/trans'):
+    def read_transitions_file(self, transitions):
         # Count the times of transitioning from one state to another
         # Calculate the probability
         # Give value to self.T
         file = open(str(transitions), 'r')
+        temp = [0, 0, 0, 0]
         for line_str in file.readlines():
             line = line_str.split('\n')[0].split(' ')
+            t = int(float(line[0]))
             a = int(float(line[2]))
             s = int(float(line[1]))
             s_ = int(float(line[3]))
-            self.T[a][s, s_] += 1
+            if t == 0:
+                for aa in self.A:
+                    self.T[aa][self.S[-2]][s] += 1       
+                self.T[a][s, s_] += 1
+                temp = [0, s, a, s_]
+            else:
+                if [s, a, s_] == temp[1:]:
+                    if temp[0] < 0:
+                        temp[0] += 1
+                    else:
+                        self.T[a][s, s_] += 1   
+                        temp[0] = 0
+                else:
+                    self.T[a][s, s_] += 1
+                    temp = [0, s, a, s_]
         file.close()
+        #self.set_unsafes()
+        #self.set_targets()
+
         for a in range(len(self.A)):
             for s in range(len(self.S)):
                 tot = np.sum(self.T[a][s])
                 if tot == 0.0:
-                    self.T[a][s,s] = 1.0
-	    self.T[a] = sparse.bsr_matrix(self.T[a])
-	    self.T[a] = sparse.diags(1.0/self.T[a].sum(axis = 1).A.ravel()).dot(self.T[a])
+                    self.T[a][s,s ] = 0.0
+            self.T[a] = sparse.bsr_matrix(self.T[a])        
+            self.T[a] = sparse.diags(1.0/self.T[a].sum(axis = 1).A.ravel()).dot(self.T[a])
 
 
     def set_transitions_random(self):
@@ -200,285 +146,309 @@ class mdp:
         # Give value to self.T
         self.T = list()
         for a in range(len(self.A)):
-	    self.T.append(sparse.random(len(self.S), len(self.S), density = 0.1).todense())
+            self.T.append(sparse.random(len(self.S), len(self.S), density = 0.1).todense())
             for s in range(len(self.S)):
                 tot = np.sum(self.T[a][s])
                 if tot == 0.0:
                     self.T[a][s,s] = 1.0
-	    self.T[a] = sparse.bsr_matrix(self.T[a])
-	    self.T[a] = sparse.diags(1.0/self.T[a].sum(axis = 1).A.ravel()).dot(self.T[a])
+            self.T[a] = sparse.bsr_matrix(self.T[a])
+            self.T[a] = sparse.diags(1.0/self.T[a].sum(axis = 1).A.ravel()).dot(self.T[a])
 
     def set_policy_random(self):
         self.policy = np.random.random((len(self.S), len(self.A))) 
-        self.P = sparse.bsr_matrix(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
+        self.policy = self.policy/np.reshape(np.linalg.norm(self.policy, axis = 1, ord = 1), [len(self.S), 1])
+        self.P = sparse.bsr_matrix(np.zeros([len(self.S), len(self.S)], dtype=float))
+        '''
         for a in range(len(self.A)):
             self.P += self.T[a].dot(sparse.bsr_matrix(np.repeat(np.reshape(self.policy.T[a], [len(self.S), 1]), len(self.S), axis = 1 )))
+        self.P = sparse.diags(1.0/self.P.sum(axis = 1).A.ravel()).dot(self.P)
+        '''
+        for a in self.A:
+            if isinstance(self.T[a], np.ndarray) is False:
+                self.T[a] = self.T[a].todense()
+            policy = np.reshape(self.policy.T[a], (len(self.S), 1))
+            self.P += np.multiply(self.T[a], policy)
+        self.P = sparse.bsr_matrix(self.P)
         self.P = sparse.diags(1.0/self.P.sum(axis = 1).A.ravel()).dot(self.P)
         
         print("DTMC transition constructed")
+        return self.policy
 
-
-    def set_policy(self, policy):
-        if isinstance(policy, sparse.csr_matrix) or isinstance(policy, sparse.csc_matrix):
-        	self.policy = policy.todense()
+    def set_policy(self, policy = None):
+        if policy is None:
+            pass  
+        elif isinstance(policy, sparse.csr_matrix) or isinstance(policy, sparse.csc_matrix):
+            self.policy = policy.todense()
         else:
             self.policy = policy
+        assert self.policy.shape == (len(self.S), len(self.A))
 
-	    assert self.policy.shape == (len(self.S), len(self.A))
+        for s in self.S:
+            p_tot = self.policy[s].sum()
+            a_max = self.policy[s].argmax()
+            if p_tot < 1.0:
+                self.policy[s, a_max] += 1.0 - p_tot
+                 
+            p_tot = self.policy[s].sum()
+            if p_tot < 1.0:
+                print(self.policy[s])
+
         self.P = sparse.bsr_matrix(np.zeros([len(self.S), len(self.S)], dtype=np.float64))
+        '''
         for a in range(len(self.A)):
             self.P += self.T[a].dot(sparse.bsr_matrix(np.repeat(np.reshape(self.policy.T[a], [len(self.S), 1]), len(self.S), axis = 1 )))
         self.P = sparse.diags(1.0/self.P.sum(axis = 1).A.ravel()).dot(self.P)
-
+        '''
+        
+        for a in self.A:
+            if isinstance(self.T[a], np.ndarray) is False:
+                self.T[a] = self.T[a].todense()
+            policy = np.reshape(self.policy.T[a], (len(self.S), 1))
+            self.P += np.multiply(self.T[a], policy)
+        self.P = sparse.bsr_matrix(self.P)
+        self.P = sparse.diags(1.0/self.P.sum(axis = 1).A.ravel()).dot(self.P)
+        
         print("DTMC transition constructed")
 
     def output(self):
         # Output files for PRISM
-        os.system('rm ./state_space')
-        os.system('touch ./state_space')
-        file = open('./state_space', 'w')
+        os.system('rm ./data/state_space')
+        os.system('touch ./data/state_space')
+        file = open('./data/state_space', 'w')
         file.write('states\n' + str(len(self.S)) + '\n')
         file.write('actions\n' + str(len(self.A)) + '\n')
         file.close()
 
-        os.system('rm ./unsafe')
-        os.system('touch ./unsafe')
-        file = open('unsafe', 'w')
+        os.system('rm ./data/unsafe')
+        os.system('touch ./data/unsafe')
+        file = open('./data/unsafe', 'w')
         for i in range(len(self.unsafes)):
-            file.write(str(self.unsafes[i]) + ':\n')
+            file.write(str(self.unsafes[i]) + '\n')
         file.close()
 
-        os.system('rm ./optimal_policy')
-        os.system('touch ./optimal_policy')
-        file = open('./optimal_policy', 'w')
-
-        def writer(tup, f):
-            file.write(str(self.S[i]) +
-                       ' ' +
-                       str(self.S[j]) +
-                       ' ' +
-                       str(self.P[self.S[i], self.S[j]]) +
-                       '\n')
-
-        print("filtering self loops")
-        fil_S = filter(lambda x: self.P[self.S[x], self.S[
-                       x]] < 0.99999, range(len(self.S)))
-        print("making transitions")
-        transitions = product(fil_S, repeat=2)
-        transitions = filter(
-            lambda tup: self.P[
-                self.S[
-                    tup[0]], self.S[
-                    tup[1]]] > 1e-5, transitions)
-        p = Pool(4)
-        print("mapping writer on transitions")
-        p.map(lambda tup: writer(tup, file), transitions)
-        # for i in range(len(self.S)):
-        #	if self.P[self.S[i], self.S[i]] > 1.0 -  1E-5:
-        #		continue
-        #	for j in range(len(self.S)):
-        #		if self.P[self.S[i], self.S[j]] > 1E-5:
-        #			file.write(str(self.S[i]) + ' ' + str(self.S[j]) + ' ' + str(self.P[self.S[i], self.S[j]]) + '\n')
-        #			print(str(self.S[i]) + ' ' + str(self.S[j]) + ' ' + str(self.P[self.S[i], self.S[j]]))
-
+        os.system('rm ./data/start')
+        os.system('touch ./data/start')
+        file = open('./data/start', 'w')
+        for i in range(len(self.starts)):
+            file.write(str(self.starts[i]) + '\n')
         file.close()
 
-		
-    def expected_features_manual(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
-        if epsilon is not 1e-5:
-            self.epsilon = epsilon
-        if discount is not 0.99:
-            self.discount = discount
-        itr = 0
-        mu_temp = self.features
-        diff = float('inf')
-        assert self.P.shape[1] == self.features.shape[0]
-        assert self.P.shape[0] == self.features.shape[0]
-        while diff > epsilon:
-            itr += 1
-            print("Iteration %d, difference is %f" % (itr, diff))
-            mu = mu_temp
-            mu_temp = self.features + discount * (self.P.dot(mu))
-            diff = (abs((mu_temp - mu).max()) + abs((mu_temp - mu).min()))/2
-        
-        return mu[len(self.S)-2]/discount
+        os.system('rm ./data/mdp')
+        os.system('touch ./data/mdp')
+        file = open('./data/mdp', 'w')
+        for s in range(len(self.S)):
+            for a in range(len(self.A)):
+                for s_ in range(len(self.S)):
+                    file.write(str(self.S[s]) + ' ' + str(self.A[a]) + ' ' + str(self.S[s_]) + ' ' + str(self.T[self.A[a]][self.S[s], self.S[s_]]) + '\n')
+        file.close()
+
+    def input(self):
+        file = open('./data/state_space', 'r')
+        lines = file.readlines()
+        for i in range(len(lines)):
+            if lines[i].split('\n')[0] == 'states':
+                self.S = range(int(lines[i + 1].split('\n')[0]))
+            if lines[i].split('\n')[0] == 'actions':
+                self.A = range(int(lines[i + 1].split('\n')[0]))
+        file.close()
+
+        self.unsafes = list()
+        file = open('./data/unsafe', 'r')
+        lines = file.readlines()
+        for line in lines:
+            self.unsafes.append(int(line.split('\n')[0]))
+        file.close()
+
+
+        self.starts = list()
+        file = open('./data/start', 'r')
+        lines = file.readlines()
+        for line in lines:
+            self.starts.append(int(line.split('\n')[0]))
+        file.close()
+
+        self.T = list()
+        for a in self.A:
+            self.T.append(np.zeros([len(self.S), len(self.S)]))
+
+        file = open('./data/mdp', 'r')
+        lines = file.readlines()
+        for line in lines:
+            trans = line.split('\n')[0].split(' ')
+            self.T[int(trans[1])][int(trans[0]), int(trans[2])] = float(trans[-1])
+        file.close()
+
+    def move(self, state, action):
+            
+        prob = random.random()
+        if state == int(self.S[-2]):
+            for s in self.starts:
+                prob -= self.T[action][state, s]
+                if prob <= 0:
+                    return s
+            return self.starts[0]
+        for s in self.S:
+            prob -= self.T[action][state, s]
+            if prob <= 0:
+                return s
+        return state
+
+                
+
+
+    def expected_features_manual(self, discount = None, epsilon = None, max_iter = None):
+        if discount is None:
+            discount = self.discount
+        if epsilon is None:
+            epsilon = self.epsilon
+        if max_iter is None:
+            max_iter = self.max_iter
+
+	itr = 0
+	mu = self.features.copy()
+	diff = float('inf')
+	assert self.P.shape[1] == self.features.shape[0]
+	assert self.P.shape[0] == self.features.shape[0]
+	while diff > epsilon:
+		itr += 1	
+		mu_temp = mu.copy()
+		mu = self.features + discount * (self.P.dot(mu))
+                diff = np.linalg.norm(mu - mu_temp, axis = 1, ord = 2).max()
+	print("Expected features manually calculated after %d iterations ")
+        return mu
 	
-    def expected_features(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
-        if epsilon is not 1e-5:
-            self.epsilon = epsilon
-
-        if discount is not 0.99:
-            self.discount = discount
-        mu = []
-        for f in range(self.features.shape[-1]):
-            V = self.features[:, f].reshape(len(self.S))
-            VL = mdptoolbox.mdp.ValueIteration(np.array([self.P]), V, discount, epsilon, max_iter, initial_value = 0)
-            itr = 0
-            VL.run()
-            mu.append(VL.V[-2])
+    def expected_features(self, discount = None, epsilon = None, max_iter = None):
+        if discount is None:
+            discount = self.discount
+        if epsilon is None:
+            epsilon = self.epsilon
+        if max_iter is None:
+            max_iter = self.max_iter
+	mu = []
+	for f in range(self.features.shape[-1]):
+		V = self.features[:, f].reshape(len(self.S))
+		VL = mdptoolbox.mdp.ValueIteration(np.array([self.P]), V, discount, epsilon, max_iter, initial_value = 0)
+		VL.run()
+	        mu.append(VL.V)
+	mu =  np.array(mu).T
+        print("Expected features calculated")
         return mu
 
-    def expected_value_manual(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
+    def expected_value_manual(self, discount = None, epsilon = None, max_iter = None):
+        if discount is None:
+            discount = self.discount
+        if epsilon is None:
+            epsilon = self.epsilon
+        if max_iter is None:
+            max_iter = self.max_iter
 
-        if epsilon is not 1e-5:
-            self.epsilon = epsilon
-        if discount is not 0.99:
-            self.discount = discount
         itr = 0
-        v_temp = self.reward
-        if type(self.P) is not type(self.T[0]):
-            self.P = type(self.T[0])(self.P)
+        v = self.rewards
         diff = float('inf')
         while diff > epsilon:
             itr += 1
-        print("Iteration %d, difference is %f" % (itr, diff))
-        v = v_temp
-        v_temp = self.reward + discount * (self.P.dot(v))
-        diff = (abs((v_temp - v).max()) + abs((v_temp - v).min()))/2
+	    print("Iteration %d, difference is %f" % (itr, diff))
+	    v_temp = v
+	    v = self.rewards + discount * (self.P.dot(v))
+            diff = (abs((v_temp - v).max()) + abs((v_temp - v).min()))/2
+	print("Expected value calculated")
         return v
 
+			
 
-    def expected_value(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
-        if epsilon is not 1e-5:
-            self.epsilon = epsilon
-        if discount is not 0.99:
-            self.discount = discount
-        if type(self.P) is not type(self.T[0]):
-            self.P = type(self.T[0])(self.P)
-        VL = mdptoolbox.mdp.ValueIteration(np.array([self.P]), self.reward, discount, epsilon, max_iter, initial_value = 0)
-        print("Calculating expected value")
-        VL.run()
-        return VL.V
+    def expected_value(self, discount = None, epsilon = None, max_iter = None):
+        if discount is None:
+            discount = self.discount
+        if epsilon is None:
+            epsilon = self.epsilon
+        if max_iter is None:
+            max_iter = self.max_iter
 
-    def value_iteration(self, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
-        if epsilon is not 1e-5:
-            self.epsilon = epsilon
-        if discount is not 0.99:
-            self.discount = discount
-        #M = mdptoolbox.mdp.MDP(np.array(self.T), reward, discount, epsilon, max_iter)
-        VL = mdptoolbox.mdp.ValueIteration(np.array(self.T), self.reward, discount, epsilon, max_iter, initial_value = 0)
-        VL.run()
-        policy = np.zeros([len(self.S), len(self.A)]).astype(float)
-        for s in range(len(VL.policy)):
-            policy[s, VL.policy[s]] = 1.0
-        policy = sparse.csc_matrix(policy)
-        return policy
+	VL = mdptoolbox.mdp.ValueIteration(np.array([self.P]), self.rewards, discount, epsilon, max_iter, initial_value = 0)
+	VL.run()
+	print("Expected value calculated")
+	return VL.V
+
+    def value_iteration(self, discount = None, epsilon = None, max_iter = None):
+        if discount is None:
+            discount = self.discount
+        if epsilon is None:
+            epsilon = self.epsilon
+        if max_iter is None:
+            max_iter = self.max_iter
+
+	VL = mdptoolbox.mdp.ValueIteration(np.array(self.T), self.rewards, discount, epsilon, max_iter, initial_value = 0)
+	VL.run()
+	policy = np.zeros([len(self.S), len(self.A)]).astype(float)
+ 	for s in range(len(VL.policy)):
+		policy[s, VL.policy[s]] = 1.0
+        print("Value iteration finished, optimal policy generated")
+	return policy
+
+
+    def optimal_policy(self, theta = None):
+        if theta is None:
+            theta = self.theta
+        theta = theta/np.linalg.norm(theta, ord = 2)
+        self.rewards = np.dot(self.features, theta)
+ 
+        self.policy = self.value_iteration()
+        self.set_policy(self.policy)
+        mus = self.expected_features_manual() 
+        return mus, self.policy
 		
 	
-    def expected_value_gpu(self, reward = None, discount = 0.99, epsilon = 1e-5, max_iter = 10000):
-        if epsilon is not 1e-5:
-            self.epsilon = epsilon
-        if discount is not 0.99:
-            self.discount = discount
-        if reward is None:
-            reward = self.reward
-        itr = 0
-        value = reward
-        diff = float('inf')
-        self.P = self.P.todense()
-        while diff > epsilon:
-            itr += 1
-            value_temp = value.copy()
-            #value = self.reward + discount * self.P.dot(value)
-            for s in self.S:
-                value[s] = reward[s] + discount * gpuarray.dot(gpuarray.to_gpu(self.P[s]), gpuarray.to_gpu(value)).get()
-            
-            var = (value[len(self.S) - 2] - value_temp[len(self.S) - 2])
-            diff = abs(var.max()) +  abs(var.min())
-            print("Iteration %d, difference is %f > error bound? %d" % (itr, diff, diff > epsilon))
-        return value[len(self.S)-2]
-
-    def QP(self, expert, features, epsilon = 1e-5):
-        if epsilon is not 1e-5:
-            self.epsilon = epsilon
-        assert expert.shape[-1] == np.array(features).shape[-1]
-        G_i = []
-        h_i = []
-        for k in range(len(expert)):
-            G_i.append([0])
-        G_i.append([-1])
-        h_i = [0]
-        c = matrix(np.eye(len(expert) + 1)[-1] * -1)
-        for j in range(len(features)):
-            for k in range(len(expert)):
-                G_i[k].append( - expert[k] + features[j][k])
-            G_i[len(expert)].append(1)
-            h_i.append(0)
-        for k in range(len(expert)):
-            G_i[k] = G_i[k] + [0.0] * (k + 1) + [-1.0] + [0.0] * (len(expert) + 1 - k - 1)
-        G_i[len(expert)] = G_i[len(expert)] + [0.0] * (1 + len(expert)) + [0.0]
-        h_i = h_i + [1] + (1 + len(expert)) * [0.0]
-        G = matrix(G_i)
-        h = matrix(h_i)
-        dims = {'l': 1 + len(features), 'q': [len(expert) + 1, 1], 's': []}
-        start = time.time()
-        sol = solvers.conelp(c, G, h, dims)
-        end = time.time()
-        print("QP operation time = " + str(end - start))
-        print(sol.keys())
-        print sol['status']
-        solution = np.array(sol['x'])
-        if solution is not None:
-            solution=solution.reshape(len(expert) + 1)
-            w = solution[:-1]
-            t = solution[-1]
-        else:
-            w = None
-            t = None
-        
-        return w, t
 	
-    def LP_value(self, epsilon = 1e-5, discount = 0.5):
-        if epsilon is not 1e-5:
-            self.epsilon = epsilon
-        if discount is not 0.99:
-            self.discount = discount
-        if not isinstance(self.P, sparse.csr_matrix):
-            self.P = sparse.csr_matrix(self.P)
-        start = time.time()
-        c = np.ones((len(self.S)))
-        A_ub = discount * self.P.transpose() - sparse.eye(len(self.S))
-        assert A_ub.shape == (len(self.S), len(self.S))
-        b_ub = -1 * self.reward
-        sol = optimize.linprog(c = c, A_ub = A_ub.todense(), b_ub = b_ub, method = 'simplex')
-        end = time.time()
-        print('Solving one expected value via sparse LP, time = %f' % (end - start))
-        return np.reshape(np.array(sol['x']), (len(self.S)))
-    
+    def LP_value_scipy(self, epsilon = None, discount = None):
+        if discount is None:
+            discount = self.discount
+        if epsilon is None:
+            epsilon = self.epsilon
 
-    def LP_value_(self, epsilon = 1e-5, discount = 0.5):
-        if epsilon is not 1e-5:
-            self.epsilon = epsilon
-        if discount is not 0.99:
-            self.discount = discount
+	if not isinstance(self.P, sparse.csr_matrix):
+		self.P = sparse.csr_matrix(self.P)
+	start = time.time()
+	c = np.ones((len(self.S)))
+    	A_ub = discount * self.P.transpose() - sparse.eye(len(self.S))
+	assert A_ub.shape == (len(self.S), len(self.S))
+	b_ub = -1 * self.rewards
+	sol = optimize.linprog(c = c, A_ub = A_ub.todense(), b_ub = b_ub, method = 'simplex')
+	end = time.time()
+	print('Solving one expected value via sparse LP, time = %f' % (end - start))
+	return np.reshape(np.array(sol['x']), (len(self.S)))
+	
+
+    def LP_value_cvxopt(self, epsilon = None, discount = None):
     	self.P = self.P.todense()
-        assert self.P.shape == (len(self.S), len(self.S))
+	assert self.P.shape == (len(self.S), len(self.S))
     	start = time.time()
     	c = np.ones((len(self.S))).tolist()
     	G = (discount * self.P.T - np.eye(len(self.S))).tolist()
-    	h = (-1 * self.reward).tolist()
+    	h = (-1 * self.rewards).tolist()
     	sol = solvers.lp(matrix(c), matrix(G), matrix(h))
     	end = time.time()
     	print('Solving one expected value via LP, time = ' + str(end - start))
-        return np.reshape(np.array(sol['x']), (len(self.S)))
+	return np.reshape(np.array(sol['x']), (len(self.S)))
 
-    def LP_features(self, epsilon = 1e-5, discount = 0.5):
-        if epsilon is not 1e-5:
-            self.epsilon = epsilon
-        if discount is not 0.99:
-            self.discount = discount
+
+    def LP_features_cvxopt(self, epsilon = None, discount = None):
+        if epsilon is None:
+            epsilon = self.epsilon
+        if discount is None:
+            dicount = self.discount
     	self.P = self.P.todense()
-        assert self.P.shape == (len(self.S), len(self.S))
+	assert self.P.shape == (len(self.S), len(self.S))
     	mu = []
     	for f in range(len(self.features[0])):
-            start = time.time()
-            c = np.ones((len(self.S))).tolist()
-            G = (discount * self.P.T - np.eye(len(self.S))).tolist()
-            h = (-1 * self.features[:, f]).tolist()
-            print("Start solving feature %d..." % f)
-            sol = solvers.lp(matrix(c), matrix(G), matrix(h))
-            mu.append(np.array(sol['x']).reshape((len(self.S))))
-            print("Finished solving feature %d..." % f)
-            end = time.time()
-            print('Solving one expected feature via LP, time = ' + str(end - start))
+    		start = time.time()
+    		c = np.ones((len(self.S))).tolist()
+    		G = (discount * self.P.T - np.eye(len(self.S))).tolist()
+    		h = (-1 * self.features[:, f]).tolist()
+		print("Start solving feature %d..." % f)
+    		sol = solvers.lp(matrix(c), matrix(G), matrix(h))
+    		mu.append(np.array(sol['x']).reshape((len(self.S))))
+		print("Finished solving feature %d..." % f)
+    		end = time.time()
+    		print('Solving one expected feature via LP, time = ' + str(end - start))
     	return mu
+        

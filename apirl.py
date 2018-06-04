@@ -1,171 +1,250 @@
 from mdp import mdp
-from learn import learn
 import numpy as np
 import scipy.optimize as optimize
 from cvxopt import matrix, solvers
-from sklearn.preprocessing import normalize
-import inspect
 from scipy import sparse
-from itertools import product
-from multiprocessing import Pool
 import sys
 import os
 import ast
 import time
 import mdptoolbox
-from discretizer import discretizer
-from timeit import default_timer as timer
-from numba import vectorize
-from pycuda.curandom import rand as curand
-import pycuda.gpuarray as gpuarray
-import pycuda.driver as pycu
-import pycuda.autoinit
-from pycuda.reduction import ReductionKernel
-import numba.cuda as cuda 
+from mdp import mdp
 
-from discretizer import discretizer
-import mdptoolbox 
+solvers.options['show_progress'] = False
 
-
-class apirl(mdp, object):
-    def __init__(self):
-        if sys.version_info[0] >= 3: 
-            super().__init__()
-        else:
-            super(apirl, self).__init__()
+class apirl():
+    def __init__(self, M = None, theta = None, max_iter = 30, epsilon = None):
+        self.M = M
+        if theta is not None:
+            self.theta = theta.copy()
         self.exp_mu = None
-        self.theta = None
-        pass
+        if max_iter is not None:
+            self.max_iter = max_iter
+	if epsilon is None:
+            self.epsilon = self.M.epsilon
+	else:
+	    self.epsilon = epsilon
     
-    def human_demo(self, paths = "./data/trans"):
-        exp_mu = np.zeros(self.features[0].shape)
-        mu_temp = exp_mu
+    def read_demo_file(self, paths):
+        exp_mu = np.zeros(self.M.features[0].shape)
+        mu_temp = exp_mu.copy()
         num_paths = 0
+        s = self.M.S[-2]      
+        t = 0
+        t_ = 0
+
+        avg = 0
+        init_dist = np.zeros((len(self.M.S))) 
 
         file = open(str(paths), 'r')
         for line_str in file.readlines():
-            line = line_str.split('\n')[0].split(' ')
+            #line = line_str.split('\n')[0].split(' ')
+            line = ast.literal_eval(line_str)
             t = int(float(line[0]))
             if t == 0:
-               exp_mu = exp_mu + mu_temp
-               num_paths += 1
-               mu_temp = self.features[self.S[-2]]
-               t += 1
+                avg += t_
+                diff = float('inf')
+                while diff > self.M.epsilon:
+                    t_ += 1         
+                    diff = self.M.features[s] * self.M.discount**t_
+                    mu_temp += diff
+                    diff = np.linalg.norm(diff, ord = 2)
+                exp_mu = exp_mu + mu_temp       
+                num_paths += 1
+
+                mu_temp = self.M.features[-2].copy()
+                t += 1
+
             s = int(float(line[1]))
-            mu_temp = mu_temp + self.features[s] * (self.discount**t)
-        
-        exp_mu = exp_mu + mu_temp
+            if t == 1:
+                init_dist[s] += 1
+
+            mu_temp = mu_temp + self.M.features[s] * (self.M.discount**t)
+            t_ = t
+        file.close()
+
+        diff = float('inf')
+        while diff > self.M.epsilon:
+            t_ += 1         
+            diff = self.M.features[s] * self.M.discount**t_
+            mu_temp += diff
+            diff = np.linalg.norm(diff, ord = 2)
+        exp_mu += mu_temp
+
         exp_mu = exp_mu/num_paths
+        avg = avg/num_paths
+
+        init_dist /= num_paths
+        self.M.set_initial_transitions(distribution = init_dist)
 
         print("%d demonstrated paths in total" % num_paths)
+        print("Average step length is %d" % avg)
         print("Expert expected features are:")
         print(exp_mu)
         return exp_mu
 
-    def optimal_policy(self, theta):
-        if theta is None:
-            theta = self.theta
-        theta = np.reshape(theta/np.linalg.norm(theta, ord = 2), (self.features.shape[-1], 1))
-        self.reward = np.reshape(np.dot(self.features, theta), (len(self.S), ))
-        self.policy = self.value_iteration()
-        self.set_policy(self.policy)
-        mu = self.expected_features_manual() 
-        return mu, self.policy
-
     def random_demo(self):
-        self.set_policy_random()
-        mu = self.expected_features_manual()
-        return mu
+        self.M.set_policy_random()
+        mus = self.M.expected_features_manual()
+        return mu[-2]
+
+    def QP(self, expert, features, epsilon = None):
+        if epsilon is None:
+            epsilon = self.M.epsilon
+
+	assert expert.shape[-1] == np.array(features).shape[-1]
+	c = matrix(np.eye(len(expert) + 1)[-1] * -1)
+	G_i = []
+	h_i = []
+
+	for k in range(len(expert)):
+		G_i.append([0])	
+	G_i.append([-1])
+	h_i.append(0)
+
+	for j in range(len(features)):
+		for k in range(len(expert)):
+			G_i[k].append( - expert[k] + features[j][k])	
+		G_i[len(expert)].append(1)
+		h_i.append(0)
+
+	for k in range(len(expert)):
+		G_i[k] = G_i[k] + [0.0] * (k + 1) + [-1.0] + [0.0] * (len(expert) + 1 - k - 1)
+	G_i[len(expert)] = G_i[len(expert)] + [0.0] * (1 + len(expert)) + [0.0]
+	h_i = h_i + [1] + (1 + len(expert)) * [0.0]
+
+	G = matrix(G_i)
+	h = matrix(h_i)
+
+	dims = {'l': 1 + len(features), 'q': [len(expert) + 1, 1], 's': []}
+	start = time.time()
+	sol = solvers.conelp(c, G, h, dims)
+	end = time.time()
+	print("QP operation time = " + str(end - start))
+	solution = np.array(sol['x'])
+	if solution is not None:
+		solution=solution.reshape([len(expert) + 1]).tolist()
+		w = solution[0:-1]
+		t = solution[-1]
+	else:
+		w = None
+		t = None
+	return w, t
     
-    def iteration(self, exp_mu = None, max_iter = None):
+    def iteration(self, exp_mu = None):
         if exp_mu is None:
-            exp_mu = self.exp_mu
+            exp_mu = self.exp_mu.copy()
+        features = list()
 
-        if max_iter is None:
-            max_iter = self.max_iter
-    
-        mus = list()
-
-        print("Generated initial policy")
-        theta = np.random.random((len(self.features[0])))
+        print("Generating initial policy for AL")
+        theta = np.ones((len(self.M.features[0])))
         theta = theta/np.linalg.norm(theta, ord = 2)
-        mu, policy = self.optimal_policy(theta)
-        print("Initial policy features:")
+        print("Initial policy weight vector:")
+        print(theta)
+
+        mus, policy = self.M.optimal_policy(theta.copy())
+        mu = mus[-2].copy()
+        print("Initial policy feature vector:")
         print(mu)
 
         err = float('inf')
-	err_ = 0
 	
         itr = 0
         
         diff = np.linalg.norm(exp_mu - mu, ord = 2)
-        opt = (diff, theta, self.policy, mu)
+        print("Initial policy feature margin: %f" % diff)
+        diff_ = 0.0
+
+        opt = {'diff': diff, 
+                'theta': theta.copy(), 
+                'policy': policy.copy(), 
+                'mu': mu.copy()} 
+        features.append(mu.copy())
         
-        print("APIRL iteration start:")
-        while err > self.epsilon and itr <= max_iter:
-            print("\n\n\nAPIRL iteration %d, error = %f" % (itr, err))
-            if abs(err - err_) < self.epsilon:
-                print("Stuck in local optimum. End iteration")
+        print("\n>>>>>>>>APIRL iteration start, learn from:")
+        print(exp_mu)
+        print(">>>>>>>>>>Max iteration number: %d" % self.max_iter)
+        print(">>>>>>>>>>epsilon: %f" % self.epsilon)
+        while True:
+            print("\n>>>>>>>>>Iteration %d" % itr)
+            if diff <= self.epsilon:
+                print(">>>>>>>>>>>Converge<<<<<<<<<<\
+                        epsilon-close policy found" % diff)
                 break
-            err_ = err
+            
+            if itr >= self.max_iter:      
+                print("Reached maximum iteration. Return best learnt policy.")
+                break
+            #if abs(diff - diff_) < self.M.epsilon:
+            #    print("Reached local optimum. End iteration")
+            #    break
+            diff_ = diff
 
             itr += 1
-            mus.append(mu)
-            theta, err  = self.QP(exp_mu, mus) 
+            features.append(mu.copy())
+            theta, err  = self.QP(exp_mu, features) 
 
-            print("Previous candidates error:")
-            print(err)
+            print("QP error: %f" % err)
 
-            print("New candidate policy weight:")
+            theta = theta/np.linalg.norm(theta, ord = 2)
+            print("New candidate policy weight vector:")
             print(theta)
 
-            mu, policy  = self.optimal_policy(theta)
-
-            print("New candidate policy features:")
+            mus, policy  = self.M.optimal_policy(theta)
+            mu = mus[-2].copy()
+            print("New candidate policy feature vector:")
             print(mu)
 
+        
             diff = np.linalg.norm(mu - exp_mu, ord = 2)
-            if diff < opt[0]:
-                opt = (diff, theta, self.policy, mu)
-        	print("Update best policy")
+            print("Feature margin: %f" % diff)
 
-        if err <= self.epsilon:
-            print("\epsilon-close policy is found. APIRL finished")
-            return theta, policy, mu 
+            if diff < opt['diff']:
+                opt = {'diff': diff, 
+                        'theta': theta.copy(), 
+                        'policy': policy.copy(), 
+                        'mu':mu.copy()} 
+        	print("Update best learnt policy")
+
+        if diff <= self.epsilon:
+            print("\n<<<<<<epsilon-close policy is found. APIRL finished")
         else:
-            print("Can't find \espsilon-close policy. APIRL stop")
-            return opt[1], opt[2], opt[3]
+            print("\n<<<<<<Can't find espsilon-close policy. APIRL stop")
 
-    def run(self, epsilon = 1e-5, max_iter = 30):
+	file = open('./data/log', 'a')
+	file.write("\nAL ends after " + str(itr) + " iterations\n")
+	file.close()
+
+        print("Optimal policy weight vector:")
+        print(opt['theta'])
+        print("Optimal policy feature vector:")
+        print(opt['mu'])
+        print("Feature margin: %f" % opt['diff'])
+        return opt
+
+    def run(self, option = None):
         if True:
-            #real = raw_input("learn from 1. human 2. optimal policy 3. random policy, 4. exit")
-            real = 1
+            if option is None:
+                option = raw_input("Expectef features are from 1. human 2. optimal policy 3. random policy, 4. exit")
+                option = int(option)
 
-            if real == 4:
+            if option == 4:
                 return
-            elif real == 1:
-                self.exp_mu = self.human_demo()
-            elif real == 2:
-                self.exp_mu = self.optimal_policy()
-            elif real == 3:
+            elif option == 1:
+                self.exp_mu = self.read_demo_file()
+            elif option == 2:
+                mus, _  = self.M.optimal_policy()
+                self.exp_mu = mus[-2]
+            elif option == 3:
                 self.exp_mu = self.random_demo()
             else:
                 return
-            theta, policy, mu = self.iteration(max_iter = max_iter)
+            opt = self.iteration()
 
-        print("weight")
-        print(theta)
-        print("features")
-        print(mu)
 
-        file = open("./data/policy", 'w')
-        file.write(str(len(self.S)) + ":states:" + str(len(self.A)) + ":action:probability\n")
-        for s in self.S:
-            for a in self.A:
-                file.write(str(s) + ':' + str(a) + ':' + str(policy[s][a]) + '\n') 
-        file.close()
+        return opt
                 
         
 #if __name__ == "__main__":
-#    AL = apprenticeship_learning()
+#    AL = apprenticeship_Ming()
 #    AL.run()

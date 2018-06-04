@@ -11,9 +11,53 @@ import scipy.sparse as sparse
 
 
 
-class run(object):
-    def __init__(maxsize):
-	pass
+class toyota(grids, object):
+    def __init__(self):
+        if sys.version_info[0] >= 3:  
+            super().__init__()
+        else:
+            super(cartpole, self).__init__()
+        ##[front dist, rear dist, left, right, front speed, rear speed, left speed, right speed, lane pos]
+	'''
+        self.threshes = [
+                         [5],#front dist
+                         [5],#rear dist
+                         [1],#left
+                         [1],#right
+                         [5],#front speed
+                         [-30],#rear speed
+                         [-30],#left speed
+                         [-30],#right speed
+                         [-42.0]#lane pos
+                         ] ##list of threshes for each dimension
+        
+
+        # Thresholds for each interval
+        self.threshes = [
+                         [5, 15, 25],  # front dist
+                         [5, 15, 25],  # rear dist
+                         [1],  # left
+                         [1],  # right
+                         [-5, 5],  # front speed
+                         [-5, 5],  # rear speed
+                         [-5, 5],  # left speed
+                         [-5, 5],  # right speed
+                         [-42.0, -40.5],  # lane pos
+                         ]  # list of threshes for each dimension
+        '''
+        self.threshes = [
+                     [-41],  # car1 lane position
+                     [0, 20, 40],  # car1 velocity
+                
+                     [-41],  # car2 lane
+                     [-30, -10, 10, 30],  # car2 distance
+                     [-10, 0, 10],  # car2 speed
+                         
+                     [-41],  # car3 lane
+                     [-30, -10, 10, 30],  # car3 distance
+                     [-10, 0, 10],  # car3 speed
+                     ]  # list of threshes for each dimension
+        self.grids = []
 
 #    def limit_memory(self):
 #	maxsize = self.maxsize
@@ -26,7 +70,7 @@ class run(object):
         #preprocess_list('/home/zekunzhou/workspace/toyota_project/data/data.json')
         
         #M = mdp.mdp()
-        
+    
 	M = apirl.apirl()
         
         M.build_from_discretizer(num_actions = 2 * 3)
@@ -35,9 +79,9 @@ class run(object):
         
         M.run(max_iter = 50)
 
-        #M.build_from_config(15000, 5)
-        #M.set_transitions_random()
-        #M.set_policy_random()
+        M.build_from_config(15000, 5)
+        M.set_transitions_random()
+        M.set_policy_random()
 
         M.reward = np.random.random([len(M.S), ]).astype(float)
         

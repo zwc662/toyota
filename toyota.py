@@ -84,7 +84,7 @@ class toyota(grids, object):
         self.discount = 0.99
         
     def coord_to_action(self, observation):
-        return observation[0] * 3 + observation[1]
+        return observation[0] + observation[1] * 2
 
     def build_demo(self, path = './data/data', freq = 20):
         # Preprocess the data set file which contains trajectories
@@ -219,10 +219,14 @@ class toyota(grids, object):
             
  
     def learn_from_demo_file(self, path = './data/trans'):
-        learn = apirl(self.M, max_iter = 1, epsilon = 1E-3) 
+        learn = apirl(self.M, max_iter = 30, epsilon = 1E-3) 
         demo_mu = learn.read_demo_file(paths = path) 
         opt = learn.iteration(exp_mu = demo_mu)
         policy = opt['policy']
+        self.write_policy(policy)
+    
+
+    def write_to_policy(self, policy):
         file = open('./data/policy_' + time.strftime("%m_%d_%H_%m_%s", time.localtime()), 'w')
         for s in self.M.S:
             for a in self.M.A:
@@ -230,10 +234,28 @@ class toyota(grids, object):
             file.write('\n')
         file.close()
 
+    def raw_to_observation(self, data):
+        assert data.shape[1] == 3
+        car1 = data[:, 0]
+        car2 = data[:, 1]
+        car3 = data[:, 2]
+        
+        return [car1[2], car1[0], car1[3], 
+                car2[0], car2[2] - car1[2], car2[3] - car1[3], 
+                car3[0], car3[2] - car1[2], car3[3] - car1[3]]
+
+    def raw_to_index(self, data):
+        observation = self.raw_to_observation(data)
+        index = self.observation_to_index(observation)
+    
+    def raw_to_policy(self, data, policy):
+        return int(np.argmax(policy[index]))
+
+
 
 if __name__ == "__main__":
     toyota = toyota()
-    toyota.build_demo()
+    #toyota.build_demo()
     toyota.set_transitions()
     #toyota.write_mdp_file()
     #toyota.build_mdp_from_file()

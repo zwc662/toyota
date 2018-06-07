@@ -394,7 +394,9 @@ class mdp():
  
         self.policy = self.value_iteration()
         self.set_policy(self.policy)
+        #mus = self.expected_features_manual() 
         mus = self.expected_features_manual() 
+
         return mus, self.policy
 		
 	

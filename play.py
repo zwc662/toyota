@@ -26,228 +26,105 @@ The returned action is an integer chosen from {0, 1, 2, 3, 4}, in which 0 means 
 
 """
 
-class Neighbor:
-    def _init_(self, f_dis, b_dis, l, r, f_v, b_v, l_v, r_v, lane_p):
-        self.f_dis = f_dis
-        self.b_dis = b_dis
-        self.l = l
-        self.r = r
-        self.f_v = f_v
-        self.b_v = b_v
-        self.l_v = l_v
-        self.r_v = r_v
-        self.lane_p = lane_p
-
-class Observation:
-    def __init__(self, car1, car2, car3):
-        # Transfer car data to array
-        self.car_central = np.array(car1)
-        self.car2 = np.array(car2)
-        self.car3 = np.array(car3)
-        self.lane_p = car1[0]
-        
-        #set no_car_distance and no_car_velocity
-        self.no_car_dis = 500
-        self.no_car_v = -30
-        
-    def relative_value(self):
-        #Compute the relative distance and velocity between cars
-        gap2 = self.car2 - self.car_central
-        gap3 = self.car3 - self.car_central
-        return gap2, gap3
-    
-    def relative_position(self):
-        #Get the relative values for cars
-        gap2, gap3 = self.relative_value()
-        
-        #initialize position around the central car
-        rel_position = np.zeros(8)
-        
-        #if car2 is in front or back of the central car
-        if gap2[2]>=0 and abs(gap2[0])<= 2:
-            rel_position[0] = 1
-        elif gap2[2]<=0 and abs(gap2[0])<= 2:
-            rel_position[1] = 1
-            
-        # if car2 is in left or right of the central car
-        if gap2[0]>2 and gap2[0]<4 and abs(gap2[2])<= 10:
-            rel_position[2] = 1
-        elif gap2[0]<-2 and gap2[0]>-4 and abs(gap2[2])<= 10:
-            rel_position[3] = 1
-        
-        # if car3 is in front or back of the central car
-        if gap3[2]>=0 and abs(gap2[0])<= 2:
-            rel_position[4] = 1
-        elif gap3[2]<=0 and abs(gap2[0])<= 2:
-            rel_position[5] = 1
-         
-        # if car3 is in left or right of the central car
-        if gap3[0]>2 and gap3[0]<4 and abs(gap3[2])<= 10:
-            rel_position[6] = 1
-        elif gap3[0]<-2 and gap3[0]>-4 and abs(gap3[2])<= 10:
-            rel_position[7] = 1  
-        return rel_position
-    
-    def around(self):
-        #Get the relative position
-        gap2, gap3 = self.relative_value()
-        rel_position = self.relative_position()
-        
-        #Set no_car_distance and no_car_velocity
-        no_car_dis = self.no_car_dis
-        no_car_v = self.no_car_v
-        
-        #Initilize Neighbor()
-        dis = Neighbor()
-        
-        #Extract from raw data
-        y_dis = np.zeros(2)
-        y_v = np.zeros(2)
-        x_dis = np.zeros(2)
-        
-        y_dis[0] = gap2[2]
-        y_dis[1] = gap3[2]
-        
-        x_dis[0] = gap2[0]
-        x_dis[1] = gap3[0]
-        
-        y_v[0] = gap2[3]
-        y_v[1] = gap3[3]
-        
-        
-        front_dis = np.zeros(2)
-        rear_dis = np.zeros(2)
-        left_dis = np.zeros(2)
-        right_dis = np.zeros(2)
-            
-        front_dis[0] = rel_position[0]*y_dis[0] 
-        front_dis[1] = rel_position[4]*y_dis[1]
-        rear_dis[0] = rel_position[1]*y_dis[0]
-        rear_dis[1] = rel_position[5]*y_dis[1]
-        left_dis[0] = rel_position[2]*x_dis[0]
-        left_dis[1] = rel_position[6]*x_dis[1]
-        right_dis[0] = rel_position[3]*x_dis[0]
-        right_dis[1] = rel_position[7]*x_dis[1]
-            
-        if np.max(front_dis) == 0:
-            dis.f_dis = no_car_dis
-            dis.f_v = -no_car_v
-        else:
-            dis.f_dis = np.min(front_dis[front_dis>0])
-            dis.f_v = y_v[np.argmin(front_dis[front_dis>0])]
-                
-        if np.min(rear_dis) == 0:
-            dis.b_dis = no_car_dis
-            dis.b_v = no_car_v
-        else:
-            dis.b_dis = abs(np.min(rear_dis))
-            dis.b_v = y_v[np.argmin(rear_dis)]
-        
-        if rel_position[2] == 1 or rel_position[6] == 1:
-            dis.l = 1
-            dis.l_v = y_v[np.argmin(left_dis[left_dis>0])]
-        else:
-            dis.l = 0
-            dis.l_v = no_car_v
-            
-        if rel_position[3] == 1 or rel_position[7] == 1:
-            dis.r = 1
-            dis.r_v = abs(y_v[np.argmin(right_dis)])
-        else:
-            dis.r = 0
-            dis.r_v = no_car_v
-            
-        return dis
-    
-    def convert_rawdata(self):
-        #Get current around state
-        cur_state = self.around()
-        
-        #Get current lane_position of the central car
-        cur_state.lane_p = self.lane_p
-        return [cur_state.f_dis, cur_state.b_dis, cur_state.l, cur_state.r, 
-                cur_state.f_v, cur_state.b_v, cur_state.l_v, cur_state.r_v, 
-                cur_state.lane_p]
-        
-
 
 class play:
-
-    def __init__(self, policy = './data/policy'):
-        ##[front dist, rear dist, left, right, front speed, rear speed, left speed, right speed, lane pos]
-
-        # Thresholds for each interval
+    def __init__(self):
+        # Transfer car data to array
+        observation = list()
+        policy = list()
+        state = 0
+        action = 0
+        
         self.threshes = [
-                         [5, 15, 25],  # front dist
-                         [5, 15, 25],  # rear dist
-                         [1],  # left
-                         [1],  # right
-                         [-5, 5],  # front speed
-                         [-5, 5],  # rear speed
-                         [-5, 5],  # left speed
-                         [-5, 5],  # right speed
-                         [-42.0, -40.5],  # lane pos
-                         ]  # list of threshes for each dimension
+                     [-41],  # car1 lane position
+                     [0, 20, 40],  # car1 velocity
+                
+                     [-41],  # car2 lane
+                     [-30, -10, 10, 30],  # car2 distance
+                     [-10, 0, 10],  # car2 speed
+                         
+                     [-41],  # car3 lane
+                     [-30, -10, 10, 30],  # car3 distance
+                     [-10, 0, 10],  # car3 speed
+                     ]  # list of threshes for each dimension
         self.grids = []
         for i in self.threshes:
             # number of intervals in each dimension
             self.grids.append(len(i) + 1)
-        # [front dist, rear dist, left, right, front speed, rear speed, left speed, right speed, lane pos]
-        self.action_table = None
-        self.build_action_table(policy)
+
+    def policy(self, path = 'policy'):
+        file = open(path, 'r')
+        lines = file.readlines()
+        for line in lines:
+            actions = [float(a) for a in line.split(' ')[:-1]]
+            actions = np.array(actions)
+            self.policy.append(np.argmax(actions))
+        file.clost()
+        return self.policy
+
+            
+    def act(self, data, policy = None):
+        if policy is not None:
+            self.policy = policy
+
+        observation = self.rawdata(data)
+
+        state = self.observation_to_index(observation)
+        
+        return self.policy(state)
+
+    
+    def rawdata(self, data):
+        #data = [car1 lane pos, car1 y pos, car1 z pos, car1 v, \
+        #        car2 lane pos, car2 y pos, car2 z pos, car2 v, \
+        #        car3 lane pos, car3 y pos, car3 z pos, car3 v]
+
+        l_p_1 = data[0]
+        v_1 = data[3]
+        l_p_2 = data[4]
+        d_2 = data[5] - data[1]
+        v_2 = data[7] 
+        l_p_3 = data[8]
+        d_3 = data[9] - data[1]
+        v_3 = data[11]
+
+        return [l_p_1, v_1, l_p_2, d_2, v_2, l_p_3, d_3, v_3]
+
 
     def observation_to_coord(self, observation):
         # translate observation to coordinates
-        coord = np.zeros([len(self.grids)])
+        coord = np.zeros([len(self.grids)]).astype(int)
         for i in range(len(observation)):
             for j in range(len(self.threshes[i])):
                 if observation[i] >= self.threshes[i][j]:
                     continue
                 else:
-                    coord[i] = j
+                    coord[i] = int(j)
                     break
             if observation[i] >= self.threshes[i][-1]:
                 coord[i] = len(self.threshes[i])
         return coord
 
-    def build_action_table(self, policy = './policy'):
-        file = open(policy, 'r')
-        lines = file.readlines()
-        num_s = int(lines[0].split(':')[0])
-        num_a = int(lines[0].split(':')[2])
-
-        self.action_table = np.zeros([num_s, num_a]).astype(float)
-
-        for i in range(1, len(lines)):
-            line = lines[i].split(':')
-            s = int(line[0])
-            a = int(line[1])
-            prob = float(line[-1])
-            self.action_table[s, a] = prob
-        file.close()
-
-    def observation_to_action(self, observation, deterministic = True):
+    def observation_to_index(self, observation):
         coord = self.observation_to_coord(observation)
-        s = 0
-        base = 0
+        index = self.coord_to_index(coord)
+        return int(index)
+
+
+    def index_to_coord(self, index):
+        coord = self.grids[:]
+        for i in range(len(self.grids)):
+            coord[len(self.grids) - 1 - i] = index%self.grids[len(self.grids) - 1 - i]
+            index = int(index/self.grids[len(self.grids) - 1 - i])
+        return coord
+
+    def coord_to_index(self, coord):
+        # Translate observation to coordinate by calling the grids
+        # Then translate the coordinate to index
+        index = 0
+        base = 1
         for i in range(len(coord)):
-            s += int(coord[i]) + base 
-            base *= self.grids[i]
-
-        if deterministic is False:
-            prob = random.random()
-            for a in range(len(self.action_table[s])):
-                if prob - self.action_table[s, a] > 0:
-                    prob = prob - self.action_table[s, a]
-                else:
-                    return a
-        return np.argmax(self.action_table[s]) 
-
-
-    def run(self, observation):
-        converter = Observation(observation[0], observation[1], observation[2])
-        observation = converter.convert_rawdata()
-        action = self.observation_to_action(observation, deterministic = True)
-        print(action)
-        return action
+            index += coord[len(coord) - 1 - i] * base 
+            base *= self.grids[len(self.grids) - 1 - i]
+        return int(index)
 

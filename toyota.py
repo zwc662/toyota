@@ -125,9 +125,11 @@ class toyota(grids, object):
                 action[0] = 0
             
             #If speed increases
-            if coord_[1] - coord[1] >= 1:
+            #if coord_[1] - coord[1] >= 1:
+            if observation_[1] - observation[1] > 0:
                 action[1] = 2
-            elif coord_[1] - coord[1] <= -1:
+            #elif coord_[1] - coord[1] <= -1:
+            elif observation_[1] - observation[1] < 0:
                 action[1] = 0
             else:
                 action[1] = 1
@@ -223,7 +225,7 @@ class toyota(grids, object):
         demo_mu = learn.read_demo_file(paths = path) 
         opt = learn.iteration(exp_mu = demo_mu)
         policy = opt['policy']
-        self.write_policy(policy)
+        self.write_to_policy(policy)
     
 
     def write_to_policy(self, policy):
@@ -255,7 +257,7 @@ class toyota(grids, object):
 
 if __name__ == "__main__":
     toyota = toyota()
-    #toyota.build_demo()
+    toyota.build_demo()
     toyota.set_transitions()
     #toyota.write_mdp_file()
     #toyota.build_mdp_from_file()

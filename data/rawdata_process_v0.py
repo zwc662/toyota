@@ -2,7 +2,8 @@ import numpy as np
 import h5py
 import json
 
-f = h5py.File('/Users/jiameng/Research@Bu/Toyota/DataSet.mat', 'r')
+#f = h5py.File('/Users/jiameng/Research@Bu/Toyota/DataSet.mat', 'r')
+f = h5py.File('./DataSet.mat', 'r')
 data = f.get('data')
 data = np.mat(data)
 action = f.get('Car1_act')

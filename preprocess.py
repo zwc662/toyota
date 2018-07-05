@@ -1,27 +1,27 @@
 import json
 
-def preprocess_dict(path):
+def preprocess_dict(path = './data/data.json'):
     file = open(path, 'r')
     dic = json.load(file)
     
     '''
-    print(len(dic['Front Distance']))
-    print(len(dic['Rear Distance']))
-    print(len(dic['Left']))
-    print(len(dic['Right']))
-    print(len(dic['Front Velocity']))
-    print(len(dic['Rear Velocity']))
-    print(len(dic['Left Velocity']))
-    print(len(dic['Right Velocity']))
-    print(len(dic['Lane Position']))
+    print(len(dic["Car1_Position"]))
+    print(len(dic["Car1_Lane_Position"]))
+    print(len(dic["Car1_Velocity"]))
+    print(len(dic["Car2_Lane_Position"]))
+    print(len(dic["Car2_Distance"]))
+    print(len(dic["Car2_Velocity"]))
+    print(len(dic["Car3_Lane_Position"]))
+    print(len(dic["Car3_Distance"]))
+    print(len(dic["Car3_Velocity"]))
     print(len(dic['Action']))
     '''
 
     time = 0
     trajectory = -1
     demo = {}
-    for index in range(len(dic['Front Distance']) - 1):
-        if dic['Front Distance'][index] < 5.0 or dic['Rear Distance'][index] < 5.0:
+    for index in range(len(dic["Car1_Position"]) - 1):
+        if dic["Car1_Position"][index] < 5.0 or dic["Car1_Lane_Position"][index] < 5.0:
             time = 0
             continue
         if time == 0:
@@ -31,28 +31,28 @@ def preprocess_dict(path):
         demo[trajectory][-1]['time'] = time
 
         demo[trajectory][-1]['from'] = {}
-        demo[trajectory][-1]['from']['Front Distance'] = dic['Front Distance'][index]
-        demo[trajectory][-1]['from']['Rear Distance'] = dic['Rear Distance'][index]
-        demo[trajectory][-1]['from']['Left'] = dic['Left'][index]
-        demo[trajectory][-1]['from']['Right'] = dic['Right'][index]
-        demo[trajectory][-1]['from']['Front Velocity'] = dic['Front Velocity'][index]
-        demo[trajectory][-1]['from']['Rear Velocity'] = dic['Rear Velocity'][index]
-        demo[trajectory][-1]['from']['Left Velocity'] = dic['Left Velocity'][index]
-        demo[trajectory][-1]['from']['Right Velocity'] = dic['Right Velocity'][index]
-        demo[trajectory][-1]['from']['Lane Position'] = dic['Lane Position'][index]
+        demo[trajectory][-1]['from']["Car1_Position"] = dic["Car1_Position"][index]
+        demo[trajectory][-1]['from']["Car1_Lane_Position"] = dic['Rear Distance'][index]
+        demo[trajectory][-1]['from']["Car1_Velocity"] = dic["Car1_Velocity"][index]
+        demo[trajectory][-1]['from']["Car2_Lane_Position"] = dic["Car2_Lane_Position"][index]
+        demo[trajectory][-1]['from']["Car2_Distance"] = dic["Car2_Distance"][index]
+        demo[trajectory][-1]['from']["Car2_Velocity"] = dic["Car2_Velocity"][index]
+        demo[trajectory][-1]['from']["Car3_Lane_Position"] = dic["Car3_Lane_Position"][index]
+        demo[trajectory][-1]['from']["Car3_Distance"] = dic["Car3_Distance"][index]
+        demo[trajectory][-1]['from']["Car3_Velocity"] = dic["Car3_Velocity"][index]
 
-        demo[trajectory][-1]['Action'] = dic['Action'][index]
+        demo[trajectory][-1]['Action'] = dic['Car1_Action'][index]
 
         demo[trajectory][-1]['to'] = {}
-        demo[trajectory][-1]['to']['Front Distance'] = dic['Front Distance'][index + 1]
-        demo[trajectory][-1]['to']['Rear Distance'] = dic['Rear Distance'][index + 1]
-        demo[trajectory][-1]['to']['Left'] = dic['Left'][index + 1]
-        demo[trajectory][-1]['to']['Right'] = dic['Right'][index + 1]
-        demo[trajectory][-1]['to']['Front Velocity'] = dic['Front Velocity'][index + 1]
-        demo[trajectory][-1]['to']['Rear Velocity'] = dic['Rear Velocity'][index + 1]
-        demo[trajectory][-1]['to']['Left Velocity'] = dic['Left Velocity'][index + 1]
-        demo[trajectory][-1]['to']['Right Velocity'] = dic['Right Velocity'][index + 1]
-        demo[trajectory][-1]['to']['Lane Position'] = dic['Lane Position'][index + 1]
+        demo[trajectory][-1]['to']["Car1_Position"] = dic["Car1_Position"][index + 1]
+        demo[trajectory][-1]['to']["Car1_Lane_Position"] = dic['Rear Distance'][index + 1]
+        demo[trajectory][-1]['to']["Car1_Velocity"] = dic["Car1_Velocity"][index + 1]
+        demo[trajectory][-1]['to']["Car2_Lane_Position"] = dic["Car2_Lane_Position"][index + 1]
+        demo[trajectory][-1]['to']["Car2_Distance"] = dic["Car2_Distance"][index + 1]
+        demo[trajectory][-1]['to']["Car2_Velocity"] = dic["Car2_Velocity"][index + 1]
+        demo[trajectory][-1]['to']["Car3_Lane_Position"] = dic["Car3_Lane_Position"][index + 1]
+        demo[trajectory][-1]['to']["Car3_Distance"] = dic["Car3_Distance"][index + 1]
+        demo[trajectory][-1]['to']["Car3_Velocity"] = dic["Car3_Velocity"][index + 1]
 
         time += 1
      
@@ -60,63 +60,65 @@ def preprocess_dict(path):
     with open('./data/demo.json', 'w') as f:
         json.dump(demo, f)
 
-def preprocess_list(path):
+def preprocess_list(path = './data/data.json'):
     file = open(path, 'r')
     dic = json.load(file)
 
     '''    
-    print(len(dic['Front Distance']))
-    print(len(dic['Rear Distance']))
-    print(len(dic['Left']))
-    print(len(dic['Right']))
-    print(len(dic['Front Velocity']))
-    print(len(dic['Rear Velocity']))
-    print(len(dic['Left Velocity']))
-    print(len(dic['Right Velocity']))
-    print(len(dic['Lane Position']))
+    print(len(dic["Car1_Position"]))
+    print(len(dic["Car1_Lane_Position"]))
+    print(len(dic["Car1_Velocity"]))
+    print(len(dic["Car2_Lane_Position"]))
+    print(len(dic["Car2_Distance"]))
+    print(len(dic["Car2_Velocity"]))
+    print(len(dic["Car3_Lane_Position"]))
+    print(len(dic["Car3_Distance"]))
+    print(len(dic["Car3_Velocity"]))
     print(len(dic['Action']))
     '''
 
     time = 0
     trajectory = -1
     demo = []
-    for index in range(len(dic['Front Distance']) - 1):
-        if dic['Front Distance'][index] < 5.0 or dic['Rear Distance'][index] < 5.0 or abs(dic['Front Distance'][index] - dic['Front Distance'][index + 1]) > 5 or abs(dic['Rear Distance'][index] - dic['Rear Distance'][index + 1]) > 5:
+    for index in range(len(dic["Car1_Position"]) - 1):
+        if dic["Car2_Distance"][index] < 1.0 or dic["Car3_Distance"][index] < 1.0 or abs(dic["Car1_Position"][index] - dic["Car1_Position"][index + 1]) > 5:
             time = 0
             continue
         if time == 0:
             trajectory += 1
             demo.append([])
         demo[trajectory].append([])
+
         demo[trajectory][-1].append(time)
+
         demo[trajectory][-1].append([])
-        demo[trajectory][-1][-1].append(dic['Front Distance'][index])
-        demo[trajectory][-1][-1].append(dic['Rear Distance'][index])
-        demo[trajectory][-1][-1].append(dic['Left'][index])
-        demo[trajectory][-1][-1].append(dic['Right'][index])
-        demo[trajectory][-1][-1].append(dic['Front Velocity'][index])
-        demo[trajectory][-1][-1].append(dic['Rear Velocity'][index])
-        demo[trajectory][-1][-1].append(dic['Left Velocity'][index])
-        demo[trajectory][-1][-1].append(dic['Right Velocity'][index])
-        demo[trajectory][-1][-1].append(dic['Lane Position'][index])
+        demo[trajectory][-1][-1].append(dic["Car1_Position"][index])
+        demo[trajectory][-1][-1].append(dic["Car1_Lane_Position"][index])
+        demo[trajectory][-1][-1].append(dic["Car1_Velocity"][index])
+        demo[trajectory][-1][-1].append(dic["Car2_Lane_Position"][index])
+        demo[trajectory][-1][-1].append(dic["Car2_Distance"][index])
+        demo[trajectory][-1][-1].append(dic["Car2_Velocity"][index])
+        demo[trajectory][-1][-1].append(dic["Car3_Lane_Position"][index])
+        demo[trajectory][-1][-1].append(dic["Car3_Distance"][index])
+        demo[trajectory][-1][-1].append(dic["Car3_Velocity"][index])
         
-        demo[trajectory][-1].append(dic['Action'][index])
+        demo[trajectory][-1].append(dic['Car1_Action'][index])
+
         demo[trajectory][-1].append([])
-        
-        demo[trajectory][-1][-1].append(dic['Front Distance'][index + 1])
-        demo[trajectory][-1][-1].append(dic['Rear Distance'][index + 1])
-        demo[trajectory][-1][-1].append(dic['Left'][index + 1])
-        demo[trajectory][-1][-1].append(dic['Right'][index + 1])
-        demo[trajectory][-1][-1].append(dic['Front Velocity'][index + 1])
-        demo[trajectory][-1][-1].append(dic['Rear Velocity'][index + 1])
-        demo[trajectory][-1][-1].append(dic['Left Velocity'][index + 1])
-        demo[trajectory][-1][-1].append(dic['Right Velocity'][index + 1])
-        demo[trajectory][-1][-1].append(dic['Lane Position'][index + 1])
+        demo[trajectory][-1][-1].append(dic["Car1_Position"][index + 1])
+        demo[trajectory][-1][-1].append(dic["Car1_Lane_Position"][index + 1])
+        demo[trajectory][-1][-1].append(dic["Car1_Velocity"][index + 1])
+        demo[trajectory][-1][-1].append(dic["Car2_Lane_Position"][index + 1])
+        demo[trajectory][-1][-1].append(dic["Car2_Distance"][index + 1])
+        demo[trajectory][-1][-1].append(dic["Car2_Velocity"][index + 1])
+        demo[trajectory][-1][-1].append(dic["Car3_Lane_Position"][index + 1])
+        demo[trajectory][-1][-1].append(dic["Car3_Distance"][index + 1])
+        demo[trajectory][-1][-1].append(dic["Car3_Velocity"][index + 1])
 
         time += 1
             
     file.close()
-    file = open('./data/demo', 'w')
+    file = open('./data/data', 'w')
     for i in range(len(demo)):
         for j in range(len(demo[i])):
             file.write(str(demo[i][j]) + '\n')

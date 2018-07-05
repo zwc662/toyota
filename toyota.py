@@ -1,3 +1,4 @@
+import preprocess
 import numpy as np
 import time
 import scipy as sci
@@ -30,7 +31,7 @@ class toyota(grids, object):
                          [-30],#left speed
                          [-30],#right speed
                          [-42.0]#lane pos
-                         ] ##list of threshes for each dimension
+                                        t = uuuuuu ] ##list of threshes for each dimension
         
 
         # Thresholds for each interval
@@ -86,6 +87,83 @@ class toyota(grids, object):
     def coord_to_action(self, observation):
         return observation[0] + observation[1] * 2
 
+    def build_trans(self, path = './data/data', freq = 20):
+        # Preprocess the data set file which contains trajectories
+        # Each trajectory is a list in which each element in a list is a list of time step, dict of observations and ...
+        # This method translates the observations to coords
+        tuples = []
+        
+        last_tuple = list()
+        file_i = open(path, 'r')
+        print("read list file")
+        lines = file_i.readlines()
+    
+        i = 0
+        time = 0
+        offset = 1
+
+        
+        while i < len(lines):
+            line = ast.literal_eval(lines[i])
+            observation = line[1]
+            coord = self.observation_to_coord(observation)
+            state = self.coord_to_index(coord)
+
+            actions = np.zeros([3])
+
+            line_ = list()
+            offset = 1
+            while offset < freq:
+                line_ = ast.literal_eval(lines[i + offset])
+                if line_[0] == 0:
+                    break
+                
+                #If the true trajectory ends, or offset is reached
+                action_ = int(line_[2] - 3)
+                actions[action_] += 1
+
+                offset += 1
+
+            if line_[0] == 0:
+                i += offset
+                if offset < freq/2.0:
+                    continue
+                else:
+                    line_ = ast.literal_eval(lines[i - 1])
+            else:
+                line_ = ast.literal_eval(lines[i + offset - 1])
+                i += 1
+
+            observation_ = line_[1] 
+            coord_ = self.observation_to_coord(observation_)
+            state_ = self.coord_to_index(coord_)
+
+            action = [0, 0]
+            if coord_[0] == coord[0]:
+                action[0] = 0
+            else:
+                action[0] = 1
+
+            action[1] = np.argmax(actions)
+            action = self.coord_to_action(action)
+
+            tuples.append(
+                      ('[' +
+                       str(time) +
+                       ', ' +
+                       str(state) +
+                       ', ' +
+                       str(action) +
+                       ', ' +
+                       str(state_) +
+                       ']\n'))
+
+        file_o = open('./data/trans', 'w')
+        for line_str in tuples:
+            file_o.write(line_str)
+        file_o.close()
+
+
     def build_demo(self, path = './data/data', freq = 20):
         # Preprocess the data set file which contains trajectories
         # Each trajectory is a list in which each element in a list is a list of time step, dict of observations and ...
@@ -95,68 +173,53 @@ class toyota(grids, object):
         last_tuple = list()
         file_i = open(path, 'r')
         print("read list file")
-        for line_str in file_i.readlines():
-            line = ast.literal_eval(line_str)
-            time = line[0]
-            
-            if time == 0:
-                index = 0
-            #From coord
-            observation = line[1]
-            coord = self.observation_to_coord(observation)
-            if isinstance(coord, np.ndarray) is True:
-                coord = coord.tolist()
-            if index == 0:
-                starts[self.coord_to_index(coord)] = True
-            
-            #To coord
-            observation_ = line[-1]
-            coord_ = self.observation_to_coord(observation_)
-            if isinstance(coord_, np.ndarray) is True:
-                coord_ = coord_.tolist()
-            
-            #Judge the action between coord, action = [change lane\in {0, 1}, change speed \in{0, 1, 2}]
-            action = [0, 0]
-            
-            #If lane is changed
-            if coord[0] != coord_[0]:
-                action[0] = 1
-            else:
-                action[0] = 0
-            
-            #If speed increases
-            #if coord_[1] - coord[1] >= 1:
-            if observation_[1] - observation[1] > 0:
-                action[1] = 2
-            #elif coord_[1] - coord[1] <= -1:
-            elif observation_[1] - observation[1] < 0:
-                action[1] = 0
-            else:
-                action[1] = 1
-        
-            #If there is no changes in the environment, then discard this record
-            tuple = [i for i in coord + action + coord]
-            if last_tuple == tuple and action == [0, 1] and time%freq != 0:
-                continue
-            last_tuple = [i for i in tuple]
+        lines = file_i.readlines()
+    
+        i = 0
+        time = 0
+        offset = 1
 
-            
-            
-            tuples.append(
+        observation = ast.literal_eval(lines[i]) 
+        state = self.observation_to_index(observation)
+        i += 1
+
+        while i < len(lines):
+            line = ast.literal_eval(lines[i])
+            if line[0] == 0 or offset == freq:
+                #If the true trajectory ends, or offset is reached
+                observation_ = ast.literal_eval(lines[i - 1])[1]
+                state_ = self.observation_to_index(observation_)
+                tuples.append(
                           ('[' +
-                           str(index) +
+                           str(time) +
                            ', ' +
-                           str(self.coord_to_index(coord)) +
+                           str(state) +
                            ', ' +
-                           str(self.coord_to_action(action)) +
+                           str('0') +
                            ', ' +
-                           str(self.coord_to_index(coord_)) +
+                           str(state_) +
                            ']\n'))
-            index += 1
+                #If the true trajectory ends, then time is reset to 0
+                if line[0] == 0:
+                    time == 0
+                #If the offset is reached, time index add  1
+                elif offset == freq:
+                    time += 1
+                
+                #Begin a new trajectory, reset offset
+                observation = ast.literal_eval(lines[i])[1] 
+                sate = self.observation_to_index(observation)
+                offset = 1
+                if time == 0:
+                    starts[state] = True
 
-        file_i.close()
-        
-        file_o = open('./data/trans', 'w')
+            else:
+                #Keep adding offset
+                offset += 1
+            i += 1
+
+
+        file_o = open('./data/demo', 'w')
         for line_str in tuples:
             file_o.write(line_str)
         file_o.close()
@@ -167,32 +230,36 @@ class toyota(grids, object):
                 file_o.write(str(s) + '\n')
         file_o.close()
 
-    def set_transitions(self, path = './data/trans'):   
+    def set_transitions(self, path = './data/trans', freq = 1):   
         # Count the times of transitioning from one state to another
         # Calculate the probability
         # Give value to self.T
         starts = np.zeros([len(self.M.S)])
         file = open(str(path), 'r')
-        for line_str in file.readlines():
-            #line = line_str.split('\n')[0].split(',')
-            line = ast.literal_eval(line_str)
-            a = int(float(line[2]))
-            s = int(float(line[1]))
-            s_ = int(float(line[-1]))
-            self.M.T[a][s, s_] += 1
-            if int(float(line[0])) == 0:
-                starts[s] += 1
-        file.close()
-        for a in range(len(self.M.A)):
-            for s in range(len(self.M.S)):
-                if s == self.M.S[-2]:
-                    self.M.T[a][s] = starts
-                tot = np.sum(self.M.T[a][s])
+
+        if True:
+            for line_str in file.readlines():
+                #line = line_str.split('\n')[0].split(',')
+                line = ast.literal_eval(line_str)
+                a = int(float(line[2]))
+                s = int(float(line[1]))
+                s_ = int(float(line[-1]))
+                self.M.T[a][s, s_] += 1
+                if int(float(line[0])) == 0:
+                    starts[s] += 1
+            file.close()
+
+            for a in range(len(self.M.A)):
+                for s in range(len(self.M.S)):
+                    if s == self.M.S[-2]:
+                        self.M.T[a][s] = starts
+                    tot = np.sum(self.M.T[a][s])
                 if tot == 0.0:
                     self.M.T[a][s,s] = 1.0
             self.M.T[a] = sparse.bsr_matrix(self.M.T[a])
             self.M.T[a] = sparse.diags(1.0/self.M.T[a].sum(axis = 1).A.ravel()).dot(self.M.T[a])
-
+            return
+        
     def write_mdp_file(self):
         file = open('./data/mdp', 'w')
         for s in range(len(self.M.S)):
@@ -258,6 +325,7 @@ class toyota(grids, object):
 if __name__ == "__main__":
     toyota = toyota()
     toyota.build_demo()
+    toyota.build_trans()
     toyota.set_transitions()
     #toyota.write_mdp_file()
     #toyota.build_mdp_from_file()

@@ -20,32 +20,18 @@ class toyota(grids, object):
         else:
             super(toyota, self).__init__()
         ##[front dist, rear dist, left, right, front speed, rear speed, left speed, right speed, lane pos]
-	'''
         self.threshes = [
-                         [5],#front dist
-                         [5],#rear dist
-                         [1],#left
-                         [1],#right
-                         [5],#front speed
-                         [-30],#rear speed
-                         [-30],#left speed
-                         [-30],#right speed
-                         [-42.0]#lane pos
-                                        t = uuuuuu ] ##list of threshes for each dimension
-        
-
-        # Thresholds for each interval
-        self.threshes = [
-                         [5, 15, 25],  # front dist
-                         [5, 15, 25],  # rear dist
-                         [1],  # left
-                         [1],  # right
-                         [-5, 5],  # front speed
-                         [-5, 5],  # rear speed
-                         [-5, 5],  # left speed
-                         [-5, 5],  # right speed
-                         [-42.0, -40.5],  # lane pos
-                         ]  # list of threshes for each dimension
+                     [-41],  # car1 lane position
+                     [0, 20],  # car1 velocity
+                
+                     [-41],  # car2 lane
+                     [-10, 10],  # car2 distance
+                     [0],  # car2 speed
+                         
+                     [-41],  # car3 lane
+                     [-10, 10],  # car3 distance
+                     [0],  # car3 speed
+                     ]  # list of threshes for each dimension
         '''
         self.threshes = [
                      [-41],  # car1 lane position
@@ -60,6 +46,7 @@ class toyota(grids, object):
                      [-10, 0, 10],  # car3 speed
                      ]  # list of threshes for each dimension
 
+	'''
         self.grids = []
         for i in range(len(self.threshes)):
             self.grids.append(1 + len(self.threshes[i]))
@@ -74,7 +61,7 @@ class toyota(grids, object):
         num_A = 6
 
         self.M = mdp(num_S, num_A)
-        self.M.set_features(num_features = 50) 
+        self.M.set_features(num_features = 50)  
 
         self.M.T = list()
         for a in self.M.A:
@@ -83,14 +70,18 @@ class toyota(grids, object):
         self.M.epsilon = 1e-5
         self.max_iter = 30000
         self.discount = 0.99
+
+        self.freq = 50
         
     def coord_to_action(self, observation):
         return observation[0] + observation[1] * 2
 
-    def build_trans(self, path = './data/data', freq = 20):
+    def build_trans(self, path = './data/data', freq = None):
         # Preprocess the data set file which contains trajectories
         # Each trajectory is a list in which each element in a list is a list of time step, dict of observations and ...
         # This method translates the observations to coords
+        if freq is None:
+            freq = self.freq
         tuples = []
         
         last_tuple = list()
@@ -104,8 +95,7 @@ class toyota(grids, object):
 
         
         while i < len(lines):
-            line = ast.literal_eval(lines[i])
-            observation = line[1]
+            observation = np.array(ast.literal_eval(lines[i])[1]).tolist()
             coord = self.observation_to_coord(observation)
             state = self.coord_to_index(coord)
 
@@ -114,27 +104,32 @@ class toyota(grids, object):
             line_ = list()
             offset = 1
             while offset < freq:
-                line_ = ast.literal_eval(lines[i + offset])
-                if line_[0] == 0:
+                if offset + i >= len(lines):
+                    break
+                #line_ = ast.literal_eval(lines[i + offset])
+                if ast.literal_eval(lines[i + offset])[0] == 0:
                     break
                 
                 #If the true trajectory ends, or offset is reached
-                action_ = int(line_[2] - 3)
+                action_ = int(ast.literal_eval(lines[i + offset])[2] - 3)
                 actions[action_] += 1
 
                 offset += 1
 
-            if line_[0] == 0:
+
+            if ast.literal_eval(lines[i + offset - 1])[0] == 0 or offset + i >= len(lines):
                 i += offset
-                if offset < freq/2.0:
+                if offset < freq/2.0 or i >= len(lines):
                     continue
                 else:
-                    line_ = ast.literal_eval(lines[i - 1])
+                    #line_ = ast.literal_eval(lines[i - 1])
+                    #observation_ = line_[1] 
+                    observation_ = np.array(ast.literal_eval(lines[i - 1])[1]).tolist()
             else:
-                line_ = ast.literal_eval(lines[i + offset - 1])
+                #line_ = ast.literal_eval(lines[i + offset - 1])
+                observation_ = np.array(ast.literal_eval(lines[i + offset - 1])[1]).tolist()
                 i += 1
 
-            observation_ = line_[1] 
             coord_ = self.observation_to_coord(observation_)
             state_ = self.coord_to_index(coord_)
 
@@ -164,30 +159,36 @@ class toyota(grids, object):
         file_o.close()
 
 
-    def build_demo(self, path = './data/data', freq = 20):
+    def build_demo(self, path = './data/data', freq = None):
         # Preprocess the data set file which contains trajectories
         # Each trajectory is a list in which each element in a list is a list of time step, dict of observations and ...
         # This method translates the observations to coords
+        if freq is None:
+            freq = self.freq
         starts = np.zeros([len(self.M.S)]).astype(bool)
         tuples = []
         last_tuple = list()
         file_i = open(path, 'r')
         print("read list file")
         lines = file_i.readlines()
+
     
         i = 0
+        offset = 0
         time = 0
-        offset = 1
 
-        observation = ast.literal_eval(lines[i]) 
+        observation = np.array(ast.literal_eval(lines[i])[1]).tolist() 
         state = self.observation_to_index(observation)
-        i += 1
 
+        i += 1
+        offset += 1
+
+        num_paths = 1
         while i < len(lines):
-            line = ast.literal_eval(lines[i])
-            if line[0] == 0 or offset == freq:
+            line = [j for j in ast.literal_eval(lines[i])]
+            if ast.literal_eval(lines[i])[0] == 0 or offset == freq:
                 #If the true trajectory ends, or offset is reached
-                observation_ = ast.literal_eval(lines[i - 1])[1]
+                observation_ = np.array(ast.literal_eval(lines[i - 1])[1]).tolist()
                 state_ = self.observation_to_index(observation_)
                 tuples.append(
                           ('[' +
@@ -200,24 +201,24 @@ class toyota(grids, object):
                            str(state_) +
                            ']\n'))
                 #If the true trajectory ends, then time is reset to 0
-                if line[0] == 0:
-                    time == 0
+                if ast.literal_eval(lines[i])[0] == 0:
+                    time = 0
+                    num_paths += 1
+                    observation = np.array(ast.literal_eval(lines[i])[1]).tolist() 
+                    sate = self.observation_to_index(observation)
+                    starts[state] = True
                 #If the offset is reached, time index add  1
                 elif offset == freq:
                     time += 1
-                
-                #Begin a new trajectory, reset offset
-                observation = ast.literal_eval(lines[i])[1] 
-                sate = self.observation_to_index(observation)
+                    observation = np.array(ast.literal_eval(lines[i - 1])[1]).tolist() 
+                    state = self.observation_to_index(observation)
                 offset = 1
-                if time == 0:
-                    starts[state] = True
-
             else:
                 #Keep adding offset
                 offset += 1
             i += 1
-
+        
+        print("%d paths in total" % num_paths)
 
         file_o = open('./data/demo', 'w')
         for line_str in tuples:
@@ -229,6 +230,19 @@ class toyota(grids, object):
             if starts[s]:
                 file_o.write(str(s) + '\n')
         file_o.close()
+
+    def set_features(self):
+        coords = list()
+        for s in self.M.S:
+            coords.append(self.index_to_coord(s))
+        coords = np.array(coords).astype(float)
+        norm = np.array([i + 1.0 for i in self.grids]).astype(float)
+        #norm = np.array([i[-1] for i in self.threshes])
+        coords /= norm
+        
+        assert self.M.features.shape[0] == coords.shape[0]
+        self.M.features = np.concatenate((self.M.features, coords), axis = 1)
+        assert self.M.features.shape == (len(self.M.S), 50 + len(self.threshes))
 
     def set_transitions(self, path = './data/trans', freq = 1):   
         # Count the times of transitioning from one state to another
@@ -255,7 +269,7 @@ class toyota(grids, object):
                         self.M.T[a][s] = starts
                     tot = np.sum(self.M.T[a][s])
                 if tot == 0.0:
-                    self.M.T[a][s,s] = 1.0
+                    self.M.T[a][s, -2] = 1.0
             self.M.T[a] = sparse.bsr_matrix(self.M.T[a])
             self.M.T[a] = sparse.diags(1.0/self.M.T[a].sum(axis = 1).A.ravel()).dot(self.M.T[a])
             return
@@ -287,7 +301,7 @@ class toyota(grids, object):
         file.close()
             
  
-    def learn_from_demo_file(self, path = './data/trans'):
+    def learn_from_demo_file(self, path = './data/demo'):
         learn = apirl(self.M, max_iter = 30, epsilon = 1E-3) 
         demo_mu = learn.read_demo_file(paths = path) 
         opt = learn.iteration(exp_mu = demo_mu)
@@ -320,16 +334,32 @@ class toyota(grids, object):
     def raw_to_policy(self, data, policy):
         return int(np.argmax(policy[index]))
 
+    def set_reward(self):
+        #Try to set reward now
+        self.M.rewards = np.zeros([len(self.M.S)])
+        for s in self.M.S:
+            coord = self.index_to_coord(s)
+            if (coord[0] == 0) and (coord[1] == self.grids[1] - 1) and (coord[3] == 0) and (coord[6] == 0):
+                self.M.rewards[s] = 100
+        policy = self.M.value_iteration_manual()
+        self.write_to_policy(policy)
+
 
 
 if __name__ == "__main__":
     toyota = toyota()
+    #toyota.build_mdp_from_file()
+    toyota.freq = 50
+
+    #toyota.freq = 50
     toyota.build_demo()
     toyota.build_trans()
     toyota.set_transitions()
+
+    toyota.set_features()
+
     #toyota.write_mdp_file()
-    #toyota.build_mdp_from_file()
+
+    #toyota.set_reward()
     toyota.learn_from_demo_file()
     
-
-
